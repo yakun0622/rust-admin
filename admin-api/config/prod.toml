@@ -1,0 +1,23 @@
+[app]
+name = "admin-api"
+env = "prod"
+log_level = "info"
+
+[server]
+host = "0.0.0.0"
+port = 8080
+
+[mysql]
+url = "mysql://admin:change_me@mysql:3306/rust_admin?charset=utf8mb4"
+max_connections = 80
+min_connections = 10
+acquire_timeout_secs = 10
+
+[redis]
+url = "redis://redis:6379/0"
+pool_size = 80
+connection_timeout_secs = 5
+
+[security]
+jwt_secret = "please-inject-from-secret-manager"
+jwt_expires_secs = 7200

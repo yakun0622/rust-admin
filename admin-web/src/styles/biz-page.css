@@ -1,0 +1,206 @@
+.biz-page {
+  color: #d7e9ff;
+}
+
+.biz-page .page-header__title.ant-typography {
+  color: #edf7ff;
+}
+
+.biz-page .page-header__desc.ant-typography,
+.biz-page .page-header__desc.ant-typography.ant-typography-secondary {
+  color: rgba(179, 212, 251, 0.78);
+}
+
+.biz-page .ant-card {
+  border-radius: 12px;
+  border: 1px solid rgba(71, 136, 236, 0.24);
+  background: linear-gradient(180deg, rgba(7, 30, 65, 0.78) 0%, rgba(3, 21, 51, 0.92) 100%);
+  box-shadow: inset 0 0 0 1px rgba(39, 95, 186, 0.2);
+}
+
+.biz-page .ant-card .ant-card-head {
+  border-bottom-color: rgba(66, 126, 219, 0.26);
+}
+
+.biz-page .ant-card .ant-card-head-title {
+  color: #e9f5ff;
+}
+
+.biz-page .ant-card .ant-card-body {
+  color: #d7e9ff;
+}
+
+.biz-page .ant-input,
+.biz-page .ant-input-affix-wrapper,
+.biz-page .ant-input-number,
+.biz-page .ant-input-number-input,
+.biz-page .ant-select-selector,
+.biz-page .ant-input-group-addon {
+  border-color: rgba(84, 148, 248, 0.28) !important;
+  background: rgba(8, 35, 74, 0.7) !important;
+  color: #d9ecff !important;
+}
+
+.biz-page .ant-input::placeholder {
+  color: rgba(179, 209, 248, 0.56);
+}
+
+.biz-page .ant-input-search .ant-input-group .ant-input-affix-wrapper:not(:last-child) {
+  border-inline-end-color: rgba(84, 148, 248, 0.3) !important;
+}
+
+.biz-page .ant-btn:not(.ant-btn-primary):not(.ant-btn-link):not(.ant-btn-text) {
+  border-color: rgba(84, 148, 248, 0.28);
+  background: rgba(8, 35, 74, 0.7);
+  color: #d9ecff;
+}
+
+.biz-page .ant-btn:not(.ant-btn-primary):not(.ant-btn-link):not(.ant-btn-text):hover {
+  border-color: rgba(113, 177, 255, 0.7);
+  background: rgba(13, 46, 95, 0.82);
+  color: #ecf6ff;
+}
+
+.biz-page .ant-btn-primary {
+  border: 0;
+  color: #edf7ff;
+  background: linear-gradient(90deg, #2f9cff 0%, #3b72ff 100%);
+  box-shadow: 0 8px 16px rgba(39, 108, 233, 0.35);
+}
+
+.biz-page .ant-btn-primary:hover {
+  color: #ffffff;
+  background: linear-gradient(90deg, #2aa9ff 0%, #436cff 100%);
+}
+
+.biz-page .ant-btn-link {
+  color: #69b8ff;
+}
+
+.biz-page .ant-btn-link:hover {
+  color: #8accff;
+}
+
+.biz-page .ant-table-wrapper .ant-table {
+  background: transparent;
+  color: #e4f3ff;
+}
+
+.biz-page .ant-table-wrapper .ant-table-container {
+  border: 1px solid rgba(70, 132, 228, 0.22);
+  border-radius: 10px;
+}
+
+.biz-page .ant-table-wrapper .ant-table-thead > tr > th {
+  background: rgba(7, 32, 69, 0.88) !important;
+  color: rgba(224, 241, 255, 0.95) !important;
+  border-bottom: 1px solid rgba(70, 133, 229, 0.3);
+}
+
+.biz-page .ant-table-wrapper .ant-table-tbody > tr > td {
+  background: rgba(5, 24, 54, 0.6);
+  color: rgba(214, 234, 255, 0.9);
+  border-bottom: 1px solid rgba(67, 125, 214, 0.24);
+}
+
+.biz-page .ant-table-wrapper .ant-table-tbody > tr.ant-table-row:hover > td {
+  background: rgba(14, 45, 92, 0.78) !important;
+}
+
+.biz-page .ant-table-wrapper .ant-table-placeholder .ant-table-cell {
+  background: rgba(5, 24, 54, 0.6) !important;
+  color: rgba(172, 206, 248, 0.82);
+}
+
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-item,
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  border-color: rgba(84, 148, 248, 0.28);
+  background: rgba(8, 34, 73, 0.62);
+}
+
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-item a,
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-prev .ant-pagination-item-link,
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-next .ant-pagination-item-link {
+  color: rgba(205, 229, 255, 0.88);
+}
+
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-item-active {
+  border-color: rgba(105, 171, 255, 0.78);
+  background: rgba(24, 73, 149, 0.72);
+}
+
+.biz-page .ant-table-wrapper .ant-pagination .ant-pagination-item-active a {
+  color: #eff8ff;
+}
+
+.biz-page .ant-descriptions.ant-descriptions-bordered .ant-descriptions-view {
+  border-color: rgba(67, 126, 216, 0.3);
+}
+
+.biz-page .ant-descriptions.ant-descriptions-bordered .ant-descriptions-item-label {
+  background: rgba(8, 35, 74, 0.75);
+  color: rgba(189, 220, 255, 0.84);
+}
+
+.biz-page .ant-descriptions.ant-descriptions-bordered .ant-descriptions-item-content {
+  background: rgba(7, 28, 60, 0.72);
+  color: #e7f4ff;
+}
+
+.biz-page .ant-statistic .ant-statistic-title {
+  color: rgba(181, 214, 252, 0.8);
+}
+
+.biz-page .ant-statistic .ant-statistic-content,
+.biz-page .ant-statistic .ant-statistic-content-value {
+  color: #f3f9ff;
+}
+
+.biz-page .ant-list-bordered,
+.biz-page .ant-list-bordered .ant-list-item {
+  border-color: rgba(67, 126, 216, 0.26);
+}
+
+.biz-page .ant-list-bordered {
+  background: rgba(7, 30, 65, 0.55);
+}
+
+.biz-page .ant-list .ant-list-item {
+  color: #e4f3ff;
+}
+
+.biz-page .ant-typography,
+.biz-page .ant-typography.ant-typography-secondary {
+  color: #d7e9ff;
+}
+
+.biz-modal .ant-modal-content {
+  border: 1px solid rgba(71, 136, 236, 0.3);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(6, 27, 59, 0.98) 0%, rgba(3, 18, 44, 0.98) 100%);
+  box-shadow: inset 0 0 0 1px rgba(39, 95, 186, 0.22);
+}
+
+.biz-modal .ant-modal-header {
+  border-bottom: 1px solid rgba(67, 126, 216, 0.28);
+  background: transparent;
+}
+
+.biz-modal .ant-modal-title {
+  color: #ebf6ff;
+}
+
+.biz-modal .ant-form-item-label > label {
+  color: rgba(196, 224, 255, 0.88);
+}
+
+.biz-modal .ant-input,
+.biz-modal .ant-input-affix-wrapper,
+.biz-modal .ant-select-selector,
+.biz-modal .ant-input-number,
+.biz-modal .ant-input-number-input {
+  border-color: rgba(84, 148, 248, 0.3) !important;
+  background: rgba(8, 35, 74, 0.7) !important;
+  color: #d9ecff !important;
+}

@@ -1,0 +1,60 @@
+name: Bug 报告
+description: 反馈可复现的问题
+title: "[Bug] "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        感谢反馈问题。请尽量提供可复现信息，方便快速定位。
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: 问题描述
+      description: 清晰描述发生了什么问题
+      placeholder: 例如：用户管理页面点击新增后弹窗无法打开
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+      description: 按顺序描述操作步骤
+      placeholder: |
+        1. 进入 ...
+        2. 点击 ...
+        3. 出现 ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: 预期结果
+      placeholder: 预期应该发生什么
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: 实际结果
+      placeholder: 实际发生了什么
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / 截图
+      description: 可粘贴错误日志、堆栈或截图
+      render: shell
+
+  - type: input
+    id: env
+    attributes:
+      label: 环境信息
+      description: 如 OS、Node/Rust 版本、浏览器版本
+      placeholder: macOS 14.5 / Node 20 / Rust 1.78 / Chrome 124

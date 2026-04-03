@@ -1,0 +1,40 @@
+name: Feature 请求
+description: 提交新功能或优化建议
+title: "[Feature] "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        欢迎提出改进建议。请尽量描述业务场景与收益。
+
+  - type: textarea
+    id: pain
+    attributes:
+      label: 问题/痛点
+      description: 当前遇到的限制或问题
+      placeholder: 例如：系统管理页面在大数据量时筛选效率不高
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议方案
+      description: 你期望如何改进
+      placeholder: 建议增加...
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 备选方案
+      description: 是否考虑过其他方案
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: 预期收益
+      description: 对用户/开发/运维的价值
+      placeholder: 能减少...提升...

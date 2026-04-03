@@ -1,0 +1,77 @@
+# =========================
+# OS / File Manager
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+.Spotlight-V100/
+.Trashes/
+
+# =========================
+# Editor / IDE
+# =========================
+.idea/
+.vscode/
+*.iml
+*.suo
+*.user
+*.swp
+*.swo
+*~
+
+# =========================
+# Logs / Runtime
+# =========================
+*.log
+*.pid
+*.seed
+*.pid.lock
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# =========================
+# Rust (admin-api)
+# =========================
+admin-api/target/
+
+# =========================
+# Frontend (admin-web)
+# =========================
+admin-web/node_modules/
+admin-web/dist/
+admin-web/.vite/
+admin-web/.cache/
+admin-web/.eslintcache
+admin-web/*.tsbuildinfo
+
+# Package manager cache (optional local)
+.pnpm-store/
+.npm/
+.yarn/
+
+# =========================
+# Env / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+!**/.env.example
+
+# =========================
+# Test / Coverage Artifacts
+# =========================
+coverage/
+.nyc_output/
+
+# =========================
+# Temp / Cache
+# =========================
+tmp/
+temp/
+.cache/
+
+ui/
+docs/
