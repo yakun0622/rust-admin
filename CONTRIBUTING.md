@@ -13,8 +13,7 @@
 
 1. Fork 并克隆仓库。
 2. 初始化数据库：
-   - `sql/mysql_v1_schema.sql`
-   - `sql/mysql_v1_seed.sql`
+   - `sql/rust_admin_20260403.sql`
 3. 启动后端：
    - `cd admin-api && APP_ENV=dev cargo run`
 4. 启动前端：

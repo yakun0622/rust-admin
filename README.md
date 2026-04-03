@@ -20,6 +20,16 @@ rust-admin/
 ├─ sql/                       # MySQL schema 与 seed
 ```
 
+## 系统截图
+
+### 登录页
+
+![登录页](./images/login.png)
+
+### 首页（仪表盘）
+
+![首页仪表盘](./images/dashboard.png)
+
 ## 快速开始
 
 ### 1. 启动基础依赖
@@ -90,6 +100,10 @@ npm run build
 - 行为准则：[`CODE_OF_CONDUCT.md`](./CODE_OF_CONDUCT.md)
 - 安全策略：[`SECURITY.md`](./SECURITY.md)
 - 发布清单：[`docs/open-source-checklist.md`](./docs/open-source-checklist.md)
+
+## Star 趋势
+
+[![Star History Chart](https://api.star-history.com/svg?repos=wangyakun/rust-admin&type=Date)](https://www.star-history.com/#wangyakun/rust-admin&Date)
 
 ## License
 
