@@ -2,8 +2,10 @@ use std::sync::Arc;
 
 use tokio::sync::RwLock;
 
-use crate::{
-    core::{dto::monitor::JobUpsertReqDto, model::monitor::{JobPo, OnlineUserPo}, utils::now_timestamp_millis},
+use crate::core::{
+    dto::monitor::JobUpsertReqDto,
+    model::monitor::{JobPo, OnlineUserPo},
+    utils::now_timestamp_millis,
 };
 
 const JOB_INTERVAL_MS: i64 = 60_000;
@@ -70,7 +72,10 @@ impl InMemoryMonitorRepository {
     pub async fn list_online_users(&self, keyword: Option<&str>) -> Vec<OnlineUserPo> {
         let users = self.online_users.read().await;
         filter_with_keyword(keyword, users.as_slice(), |item| {
-            format!("{} {} {} {} {}", item.username, item.ip, item.browser, item.os, item.status)
+            format!(
+                "{} {} {} {} {}",
+                item.username, item.ip, item.browser, item.os, item.status
+            )
         })
     }
 
@@ -79,7 +84,12 @@ impl InMemoryMonitorRepository {
         filter_with_keyword(keyword, jobs.as_slice(), |item| {
             format!(
                 "{} {} {} {} {} {}",
-                item.job_name, item.job_group, item.invoke_target, item.cron_expression, item.status, item.remark
+                item.job_name,
+                item.job_group,
+                item.invoke_target,
+                item.cron_expression,
+                item.status,
+                item.remark
             )
         })
     }

@@ -5,11 +5,7 @@ use axum::{
     response::Response,
 };
 
-use crate::{
-    app::state::AppState,
-    core::errors::AppError,
-    modules::auth::service::JwtClaims,
-};
+use crate::{app::state::AppState, core::errors::AppError, modules::auth::service::JwtClaims};
 
 pub async fn require_auth(
     State(state): State<AppState>,

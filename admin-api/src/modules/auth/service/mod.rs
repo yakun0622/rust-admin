@@ -8,14 +8,13 @@ use std::{
 use bcrypt::verify;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
-use sqlx::MySqlPool;
 
 use crate::{
     core::{
-        converter::auth::to_login_vo, dto::auth::LoginReqDto, errors::AppError, model::auth::UserCredentialPo,
-        vo::auth::LoginVo,
+        converter::auth::to_login_vo, dto::auth::LoginReqDto, errors::AppError,
+        model::auth::UserCredentialPo, vo::auth::LoginVo,
     },
-    modules::auth::repository::AuthRepository,
+    modules::auth::repository::{AuthRepository, LoginAuditRecord},
 };
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -31,21 +30,14 @@ pub struct AuthService {
     repo: Arc<dyn AuthRepository>,
     jwt_secret: Arc<String>,
     jwt_expires_secs: u64,
-    mysql_pool: MySqlPool,
 }
 
 impl AuthService {
-    pub fn new(
-        repo: Arc<dyn AuthRepository>,
-        jwt_secret: String,
-        jwt_expires_secs: u64,
-        mysql_pool: MySqlPool,
-    ) -> Self {
+    pub fn new(repo: Arc<dyn AuthRepository>, jwt_secret: String, jwt_expires_secs: u64) -> Self {
         Self {
             repo,
             jwt_secret: Arc::new(jwt_secret),
             jwt_expires_secs,
-            mysql_pool,
         }
     }
 
@@ -59,7 +51,8 @@ impl AuthService {
         let ip = client_ip.unwrap_or_default();
 
         if username.is_empty() || password.is_empty() {
-            self.append_login_log(None, 3, 0, "用户名和密码不能为空", &ip).await;
+            self.append_login_log(None, 3, 0, "用户名和密码不能为空", &ip)
+                .await;
             return Err(AppError::bad_request("用户名和密码不能为空"));
         }
 
@@ -70,12 +63,14 @@ impl AuthService {
             .ok_or_else(|| AppError::unauthorized("用户名或密码错误"))?;
 
         if !verify_password(password, &user)? {
-            self.append_login_log(Some(username), 3, 0, "用户名或密码错误", &ip).await;
+            self.append_login_log(Some(username), 3, 0, "用户名或密码错误", &ip)
+                .await;
             return Err(AppError::unauthorized("用户名或密码错误"));
         };
 
         if user.status != 1 {
-            self.append_login_log(Some(username), 3, 0, "账号已停用", &ip).await;
+            self.append_login_log(Some(username), 3, 0, "账号已停用", &ip)
+                .await;
             return Err(AppError::unauthorized("账号已停用"));
         }
 
@@ -92,7 +87,8 @@ impl AuthService {
             &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
         )
         .map_err(|err| AppError::internal(format!("生成令牌失败: {err}")))?;
-        self.append_login_log(Some(username), 1, 1, "登录成功", &ip).await;
+        self.append_login_log(Some(username), 1, 1, "登录成功", &ip)
+            .await;
 
         Ok(to_login_vo(&user, token, self.jwt_expires_secs))
     }
@@ -117,19 +113,16 @@ impl AuthService {
         message: &str,
         ip: &str,
     ) {
-        let _ = sqlx::query(
-            r#"
-            INSERT INTO sys_login_log (username, login_type, ip, status, message)
-            VALUES (?, ?, ?, ?, ?)
-            "#,
-        )
-        .bind(username.unwrap_or(""))
-        .bind(login_type)
-        .bind(ip)
-        .bind(status)
-        .bind(message)
-        .execute(&self.mysql_pool)
-        .await;
+        let _ = self
+            .repo
+            .append_login_log(LoginAuditRecord {
+                username: username.map(ToString::to_string),
+                login_type,
+                status,
+                message: message.to_string(),
+                ip: ip.to_string(),
+            })
+            .await;
     }
 }
 

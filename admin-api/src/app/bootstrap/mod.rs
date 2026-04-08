@@ -22,7 +22,8 @@ pub async fn run() -> anyhow::Result<()> {
         app = %cfg.app.name,
         env = %cfg.app.env,
         %addr,
-        mysql_max_connections = cfg.mysql.max_connections,
+        database_driver = %cfg.database.driver.as_str(),
+        database_max_connections = cfg.database.max_connections,
         redis_pool_size = cfg.redis.pool_size,
         "admin-api started"
     );

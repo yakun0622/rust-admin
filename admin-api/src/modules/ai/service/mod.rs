@@ -6,7 +6,9 @@ use crate::{
     core::{
         dto::ai::{CreateAiSessionReqDto, SendAiMessageReqDto},
         errors::AppError,
-        vo::ai::{AiMessageItemVo, AiMessageListVo, AiSendMessageVo, AiSessionItemVo, AiSessionListVo},
+        vo::ai::{
+            AiMessageItemVo, AiMessageListVo, AiSendMessageVo, AiSessionItemVo, AiSessionListVo,
+        },
     },
     modules::ai::repository::InMemoryAiRepository,
 };
@@ -42,7 +44,10 @@ impl AiService {
         }
     }
 
-    pub async fn create_session(&self, payload: CreateAiSessionReqDto) -> Result<AiSessionItemVo, AppError> {
+    pub async fn create_session(
+        &self,
+        payload: CreateAiSessionReqDto,
+    ) -> Result<AiSessionItemVo, AppError> {
         let title = payload
             .title
             .unwrap_or_else(|| "新会话".to_string())

@@ -1,6 +1,6 @@
 [app]
 name = "admin-api"
-env = "dev"
+env = "pg"
 log_level = "debug"
 
 [server]
@@ -8,10 +8,8 @@ host = "0.0.0.0"
 port = 8080
 
 [database]
-# driver = "mysql"
-# url = "mysql://rust_admin:M5LTAzZmRnYjdnh5@nas.app1905.cn:3306/rust_admin?charset=utf8mb4"
 driver = "postgres"
-url = "mysql://rust_admin_pgsql:3dYGRbYDE4y33E4t@nas.app1905.cn:5432/rust_admin_pgsql?charset=utf8mb4"
+url = "postgres://postgres:123456@127.0.0.1:5432/rust_admin"
 max_connections = 30
 min_connections = 5
 acquire_timeout_secs = 5

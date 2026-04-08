@@ -66,8 +66,13 @@ impl InMemoryAiRepository {
         messages.get(&session_id).cloned()
     }
 
-    pub async fn append_user_message(&self, session_id: u64, content: String) -> Option<AiMessagePo> {
-        self.append_message(session_id, "user".to_string(), content).await
+    pub async fn append_user_message(
+        &self,
+        session_id: u64,
+        content: String,
+    ) -> Option<AiMessagePo> {
+        self.append_message(session_id, "user".to_string(), content)
+            .await
     }
 
     pub async fn append_assistant_message(

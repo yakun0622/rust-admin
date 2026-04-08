@@ -3,17 +3,20 @@ pub mod integration;
 use std::sync::Arc;
 
 use crate::{
-    core::{errors::AppError, vo::log::{LoginLogItemVo, LoginLogListVo, OperLogItemVo, OperLogListVo}},
-    modules::log::repository::MySqlLogRepository,
+    core::{
+        errors::AppError,
+        vo::log::{LoginLogItemVo, LoginLogListVo, OperLogItemVo, OperLogListVo},
+    },
+    modules::log::repository::LogRepository,
 };
 
 #[derive(Clone)]
 pub struct LogService {
-    repo: Arc<MySqlLogRepository>,
+    repo: Arc<dyn LogRepository>,
 }
 
 impl LogService {
-    pub fn new(repo: Arc<MySqlLogRepository>) -> Self {
+    pub fn new(repo: Arc<dyn LogRepository>) -> Self {
         Self { repo }
     }
 

@@ -56,5 +56,8 @@ async fn remove(
     Path((resource, id)): Path<(String, u64)>,
 ) -> Result<Json<ApiResponse<SystemCrudDeleteVo>>, AppError> {
     let deleted = state.system_service.delete(&resource, id).await?;
-    Ok(Json(ApiResponse::success(SystemCrudDeleteVo { id, deleted })))
+    Ok(Json(ApiResponse::success(SystemCrudDeleteVo {
+        id,
+        deleted,
+    })))
 }

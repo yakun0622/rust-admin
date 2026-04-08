@@ -6,16 +6,18 @@ use serde_json::{Map, Value};
 
 use crate::{
     core::{errors::AppError, vo::system::SystemCrudListVo},
-    modules::system::repository::{CrudRecord, MySqlSystemRepository},
+    modules::system::repository::{
+        is_supported_resource, supported_resources, CrudRecord, SystemRepository,
+    },
 };
 
 #[derive(Clone)]
 pub struct SystemService {
-    repo: Arc<MySqlSystemRepository>,
+    repo: Arc<dyn SystemRepository>,
 }
 
 impl SystemService {
-    pub fn new(repo: Arc<MySqlSystemRepository>) -> Self {
+    pub fn new(repo: Arc<dyn SystemRepository>) -> Self {
         Self { repo }
     }
 
@@ -48,7 +50,9 @@ impl SystemService {
             .repo
             .update(resource, id, record)
             .await?
-            .ok_or_else(|| AppError::not_found(format!("{resource} 资源中不存在 id={id} 的记录")))?;
+            .ok_or_else(|| {
+                AppError::not_found(format!("{resource} 资源中不存在 id={id} 的记录"))
+            })?;
         Ok(Value::Object(updated))
     }
 
@@ -65,11 +69,11 @@ impl SystemService {
 }
 
 fn validate_resource(resource: &str) -> Result<(), AppError> {
-    if MySqlSystemRepository::is_supported(resource) {
+    if is_supported_resource(resource) {
         return Ok(());
     }
 
-    let allowed = MySqlSystemRepository::supported_resources().join(", ");
+    let allowed = supported_resources().join(", ");
     Err(AppError::bad_request(format!(
         "不支持的资源类型: {resource}，可选值: {allowed}"
     )))

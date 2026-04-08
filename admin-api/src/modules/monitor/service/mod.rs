@@ -3,17 +3,18 @@ pub mod integration;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use redis::aio::MultiplexedConnection;
-use sqlx::MySqlPool;
 
 use crate::{
     core::{
         config::AppConfig,
+        db::DbPool,
         dto::monitor::JobUpsertReqDto,
         errors::AppError,
         utils::now_timestamp_millis,
         vo::monitor::{
-            CacheKeyItemVo, CacheNamespaceItemVo, CacheNamespaceListVo, CacheSearchVo, DatasourceOverviewVo,
-            JobActionVo, JobItemVo, JobListVo, OnlineUserItemVo, OnlineUserListVo, ServerOverviewVo,
+            CacheKeyItemVo, CacheNamespaceItemVo, CacheNamespaceListVo, CacheSearchVo,
+            DatasourceOverviewVo, JobActionVo, JobItemVo, JobListVo, OnlineUserItemVo,
+            OnlineUserListVo, ServerOverviewVo,
         },
     },
     modules::monitor::repository::InMemoryMonitorRepository,
@@ -22,7 +23,7 @@ use crate::{
 #[derive(Clone)]
 pub struct MonitorService {
     repo: Arc<InMemoryMonitorRepository>,
-    mysql_pool: MySqlPool,
+    db_pool: DbPool,
     redis_client: redis::Client,
     config: Arc<AppConfig>,
     started_at_millis: i64,
@@ -31,13 +32,13 @@ pub struct MonitorService {
 impl MonitorService {
     pub fn new(
         repo: Arc<InMemoryMonitorRepository>,
-        mysql_pool: MySqlPool,
+        db_pool: DbPool,
         redis_client: redis::Client,
         config: Arc<AppConfig>,
     ) -> Self {
         Self {
             repo,
-            mysql_pool,
+            db_pool,
             redis_client,
             config,
             started_at_millis: now_timestamp_millis(),
@@ -108,7 +109,11 @@ impl MonitorService {
         Ok(to_job_item_vo(created))
     }
 
-    pub async fn update_job(&self, id: u64, payload: JobUpsertReqDto) -> Result<JobItemVo, AppError> {
+    pub async fn update_job(
+        &self,
+        id: u64,
+        payload: JobUpsertReqDto,
+    ) -> Result<JobItemVo, AppError> {
         validate_job_payload(&payload)?;
         let updated = self
             .repo
@@ -178,29 +183,23 @@ impl MonitorService {
     }
 
     pub async fn datasource_overview(&self) -> DatasourceOverviewVo {
-        let ping = sqlx::query_scalar::<_, i32>("SELECT 1")
-            .fetch_one(&self.mysql_pool)
-            .await;
-        let (ping_ok, ping_message) = match ping {
+        let (ping_ok, ping_message) = match self.db_pool.ping().await {
             Ok(_) => (true, "ok".to_string()),
             Err(err) => (false, err.to_string()),
         };
 
         DatasourceOverviewVo {
-            database: "MySQL".to_string(),
-            mysql_url: mask_mysql_url(&self.config.mysql.url),
-            max_connections: self.config.mysql.max_connections,
-            min_connections: self.config.mysql.min_connections,
+            database: self.config.database.driver.display_name().to_string(),
+            mysql_url: mask_database_url(&self.config.database.url),
+            max_connections: self.config.database.max_connections,
+            min_connections: self.config.database.min_connections,
             ping_ok,
             ping_message,
         }
     }
 
     pub async fn server_overview(&self) -> ServerOverviewVo {
-        let mysql_ok = sqlx::query_scalar::<_, i32>("SELECT 1")
-            .fetch_one(&self.mysql_pool)
-            .await
-            .is_ok();
+        let mysql_ok = self.db_pool.ping().await.is_ok();
 
         let redis_ok = match self.redis_client.get_multiplexed_async_connection().await {
             Ok(mut conn) => redis::cmd("PING")
@@ -310,11 +309,13 @@ impl MonitorService {
 
         let items = namespace_map
             .into_iter()
-            .map(|(namespace, (key_count, example_key))| CacheNamespaceItemVo {
-                namespace,
-                key_count,
-                example_key,
-            })
+            .map(
+                |(namespace, (key_count, example_key))| CacheNamespaceItemVo {
+                    namespace,
+                    key_count,
+                    example_key,
+                },
+            )
             .collect::<Vec<_>>();
 
         Ok(CacheNamespaceListVo {
@@ -404,7 +405,7 @@ fn truncate_sample(value: &str) -> String {
     }
 }
 
-fn mask_mysql_url(url: &str) -> String {
+fn mask_database_url(url: &str) -> String {
     if let Some((prefix, suffix)) = url.split_once('@') {
         if let Some((user, _)) = prefix.split_once("://") {
             return format!("{user}://***@{suffix}");

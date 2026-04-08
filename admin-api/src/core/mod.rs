@@ -1,5 +1,6 @@
 pub mod config;
 pub mod converter;
+pub mod db;
 pub mod dto;
 pub mod enums;
 pub mod errors;

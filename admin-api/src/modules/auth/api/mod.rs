@@ -22,7 +22,10 @@ async fn login(
 }
 
 fn extract_client_ip(headers: &HeaderMap) -> Option<String> {
-    if let Some(value) = headers.get("x-forwarded-for").and_then(|value| value.to_str().ok()) {
+    if let Some(value) = headers
+        .get("x-forwarded-for")
+        .and_then(|value| value.to_str().ok())
+    {
         let first = value.split(',').next().unwrap_or("").trim();
         if !first.is_empty() {
             return Some(first.to_string());

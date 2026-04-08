@@ -2,13 +2,11 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{Map, Value};
-use sqlx::{mysql::MySqlRow, MySqlPool, Row};
+use sqlx::{postgres::PgRow, PgPool, Postgres, QueryBuilder, Row};
 
 use crate::core::errors::AppError;
 
-pub mod postgres;
-
-pub type CrudRecord = Map<String, Value>;
+use super::{CrudRecord, SystemRepository};
 
 const SUPPORTED_RESOURCES: [&str; 8] = [
     "user", "role", "menu", "dept", "post", "dict", "config", "notice",
@@ -16,51 +14,17 @@ const SUPPORTED_RESOURCES: [&str; 8] = [
 
 const DEFAULT_PASSWORD_HASH: &str = "$2b$10$jh6uvsoSAuxAfUYOc5ckkecacY3x2zPL0GuvlX38JCpRHM2OtoByi";
 
-#[async_trait]
-pub trait SystemRepository: Send + Sync {
-    async fn list(
-        &self,
-        resource: &str,
-        keyword: Option<&str>,
-    ) -> Result<Vec<CrudRecord>, AppError>;
-    async fn get_by_id(&self, resource: &str, id: u64) -> Result<Option<CrudRecord>, AppError>;
-    async fn create(&self, resource: &str, payload: CrudRecord) -> Result<CrudRecord, AppError>;
-    async fn update(
-        &self,
-        resource: &str,
-        id: u64,
-        payload: CrudRecord,
-    ) -> Result<Option<CrudRecord>, AppError>;
-    async fn delete(&self, resource: &str, id: u64) -> Result<bool, AppError>;
-}
-
-pub fn supported_resources() -> &'static [&'static str] {
-    &SUPPORTED_RESOURCES
-}
-
-pub fn is_supported_resource(resource: &str) -> bool {
-    SUPPORTED_RESOURCES.contains(&resource)
-}
-
 #[derive(Debug, Clone)]
-pub struct MySqlSystemRepository {
-    pool: MySqlPool,
+pub struct PostgresSystemRepository {
+    pool: PgPool,
 }
 
-impl MySqlSystemRepository {
-    pub fn new(pool: MySqlPool) -> Arc<Self> {
+impl PostgresSystemRepository {
+    pub fn new(pool: PgPool) -> Arc<Self> {
         Arc::new(Self { pool })
     }
 
-    pub fn supported_resources() -> &'static [&'static str] {
-        &SUPPORTED_RESOURCES
-    }
-
-    pub fn is_supported(resource: &str) -> bool {
-        SUPPORTED_RESOURCES.contains(&resource)
-    }
-
-    pub async fn list(
+    async fn list(
         &self,
         resource: &str,
         keyword: Option<&str>,
@@ -80,7 +44,7 @@ impl MySqlSystemRepository {
         }
     }
 
-    pub async fn get_by_id(&self, resource: &str, id: u64) -> Result<Option<CrudRecord>, AppError> {
+    async fn get_by_id(&self, resource: &str, id: u64) -> Result<Option<CrudRecord>, AppError> {
         match resource {
             "user" => self.get_user_by_id(id).await,
             "role" => self.get_role_by_id(id).await,
@@ -96,11 +60,7 @@ impl MySqlSystemRepository {
         }
     }
 
-    pub async fn create(
-        &self,
-        resource: &str,
-        payload: CrudRecord,
-    ) -> Result<CrudRecord, AppError> {
+    async fn create(&self, resource: &str, payload: CrudRecord) -> Result<CrudRecord, AppError> {
         let created_id = match resource {
             "user" => self.create_user(&payload).await?,
             "role" => self.create_role(&payload).await?,
@@ -122,7 +82,7 @@ impl MySqlSystemRepository {
             .ok_or_else(|| AppError::internal("创建成功但读取记录失败"))
     }
 
-    pub async fn update(
+    async fn update(
         &self,
         resource: &str,
         id: u64,
@@ -151,16 +111,16 @@ impl MySqlSystemRepository {
         self.get_by_id(resource, id).await
     }
 
-    pub async fn delete(&self, resource: &str, id: u64) -> Result<bool, AppError> {
+    async fn delete(&self, resource: &str, id: u64) -> Result<bool, AppError> {
         let sql = match resource {
-            "user" => "UPDATE sys_user SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "role" => "UPDATE sys_role SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "menu" => "UPDATE sys_menu SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "dept" => "UPDATE sys_dept SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "post" => "UPDATE sys_post SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "dict" => "UPDATE sys_dict_data SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "config" => "UPDATE sys_config SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
-            "notice" => "UPDATE sys_notice SET is_deleted = 1 WHERE id = ? AND is_deleted = 0",
+            "user" => "UPDATE sys_user SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "role" => "UPDATE sys_role SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "menu" => "UPDATE sys_menu SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "dept" => "UPDATE sys_dept SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "post" => "UPDATE sys_post SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "dict" => "UPDATE sys_dict_data SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "config" => "UPDATE sys_config SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
+            "notice" => "UPDATE sys_notice SET is_deleted = 1 WHERE id = $1 AND is_deleted = 0",
             _ => {
                 return Err(AppError::bad_request(format!(
                     "不支持的资源类型: {resource}"
@@ -169,7 +129,7 @@ impl MySqlSystemRepository {
         };
 
         let result = sqlx::query(sql)
-            .bind(id)
+            .bind(to_i64(id, "id")?)
             .execute(&self.pool)
             .await
             .map_err(|err| AppError::internal(format!("删除 {resource} 失败: {err}")))?;
@@ -177,23 +137,29 @@ impl MySqlSystemRepository {
     }
 
     async fn list_users(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, username, nickname, phone, status
             FROM sys_user
             WHERE is_deleted = 0
-              AND (? = '' OR username LIKE ? OR nickname LIKE ? OR phone LIKE ?)
-            ORDER BY id DESC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询用户失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (username ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR nickname ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR phone ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询用户失败: {err}")))?;
 
         Ok(rows.into_iter().map(map_user_row).collect())
     }
@@ -203,11 +169,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, username, nickname, phone, status
             FROM sys_user
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询用户失败: {err}")))?;
@@ -220,12 +186,13 @@ impl MySqlSystemRepository {
         let phone = optional_string(payload, "phone");
         let status = enabled_status(payload.get("status"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_user (
                 username, nickname, password_hash, phone, status,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, ?, ?, 1, 1, 0)
+            ) VALUES ($1, $2, $3, $4, $5, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(username)
@@ -233,10 +200,11 @@ impl MySqlSystemRepository {
         .bind(DEFAULT_PASSWORD_HASH)
         .bind(phone)
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增用户失败: {err}")))?;
-        Ok(result.last_insert_id())
+
+        Ok(created_id as u64)
     }
 
     async fn update_user(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -248,15 +216,15 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_user
-            SET username = ?, nickname = ?, phone = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET username = $1, nickname = $2, phone = $3, status = $4, updated_by = 1
+            WHERE id = $5 AND is_deleted = 0
             "#,
         )
         .bind(username)
         .bind(nickname)
         .bind(phone)
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新用户失败: {err}")))?;
@@ -264,22 +232,27 @@ impl MySqlSystemRepository {
     }
 
     async fn list_roles(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, role_name, role_key, role_sort, status
             FROM sys_role
             WHERE is_deleted = 0
-              AND (? = '' OR role_name LIKE ? OR role_key LIKE ?)
-            ORDER BY id DESC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询角色失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (role_name ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR role_key ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询角色失败: {err}")))?;
 
         Ok(rows.into_iter().map(map_role_row).collect())
     }
@@ -289,11 +262,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, role_name, role_key, role_sort, status
             FROM sys_role
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询角色失败: {err}")))?;
@@ -306,21 +279,22 @@ impl MySqlSystemRepository {
         let sort = optional_i32(payload, "sort").unwrap_or(1);
         let status = enabled_status(payload.get("status"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_role (
                 role_name, role_key, role_sort, status, data_scope, created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, ?, 5, 1, 1, 0)
+            ) VALUES ($1, $2, $3, $4, 5, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(name)
         .bind(key)
         .bind(sort)
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增角色失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_role(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -332,15 +306,15 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_role
-            SET role_name = ?, role_key = ?, role_sort = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET role_name = $1, role_key = $2, role_sort = $3, status = $4, updated_by = 1
+            WHERE id = $5 AND is_deleted = 0
             "#,
         )
         .bind(name)
         .bind(key)
         .bind(sort)
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新角色失败: {err}")))?;
@@ -348,22 +322,27 @@ impl MySqlSystemRepository {
     }
 
     async fn list_menus(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, parent_id, menu_name, route_path, component_path, is_visible
             FROM sys_menu
             WHERE is_deleted = 0
-              AND (? = '' OR menu_name LIKE ? OR route_path LIKE ?)
-            ORDER BY parent_id ASC, order_num ASC, id ASC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询菜单失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (menu_name ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR route_path ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY parent_id ASC, order_num ASC, id ASC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询菜单失败: {err}")))?;
         Ok(rows.into_iter().map(map_menu_row).collect())
     }
 
@@ -372,11 +351,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, parent_id, menu_name, route_path, component_path, is_visible
             FROM sys_menu
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询菜单失败: {err}")))?;
@@ -391,24 +370,25 @@ impl MySqlSystemRepository {
         let component = required_string(payload, "component", "组件名")?;
         let visible = visible_status(payload.get("visible"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_menu (
                 parent_id, menu_type, menu_name, route_name, route_path, component_path,
                 perms, order_num, is_visible, status, created_by, updated_by, is_deleted
-            ) VALUES (?, 2, ?, ?, ?, ?, NULL, 0, ?, 1, 1, 1, 0)
+            ) VALUES ($1, 2, $2, $3, $4, $5, NULL, 0, $6, 1, 1, 1, 0)
+            RETURNING id
             "#,
         )
-        .bind(parent_id)
+        .bind(to_i64(parent_id, "parent_id")?)
         .bind(&name)
         .bind(&name)
         .bind(path)
         .bind(component)
         .bind(visible)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增菜单失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_menu(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -420,8 +400,8 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_menu
-            SET menu_name = ?, route_name = ?, route_path = ?, component_path = ?, is_visible = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET menu_name = $1, route_name = $2, route_path = $3, component_path = $4, is_visible = $5, updated_by = 1
+            WHERE id = $6 AND is_deleted = 0
             "#,
         )
         .bind(&name)
@@ -429,7 +409,7 @@ impl MySqlSystemRepository {
         .bind(path)
         .bind(component)
         .bind(visible)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新菜单失败: {err}")))?;
@@ -437,22 +417,27 @@ impl MySqlSystemRepository {
     }
 
     async fn list_depts(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, parent_id, dept_name, leader, phone, status
             FROM sys_dept
             WHERE is_deleted = 0
-              AND (? = '' OR dept_name LIKE ? OR leader LIKE ?)
-            ORDER BY parent_id ASC, order_num ASC, id ASC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询部门失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (dept_name ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR leader ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY parent_id ASC, order_num ASC, id ASC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询部门失败: {err}")))?;
         Ok(rows.into_iter().map(map_dept_row).collect())
     }
 
@@ -461,11 +446,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, parent_id, dept_name, leader, phone, status
             FROM sys_dept
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询部门失败: {err}")))?;
@@ -480,24 +465,25 @@ impl MySqlSystemRepository {
         let phone = optional_string(payload, "phone");
         let status = enabled_status(payload.get("status"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_dept (
                 parent_id, ancestors, dept_name, order_num, leader, phone, status,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, 0, ?, ?, ?, 1, 1, 0)
+            ) VALUES ($1, $2, $3, 0, $4, $5, $6, 1, 1, 0)
+            RETURNING id
             "#,
         )
-        .bind(parent_id)
+        .bind(to_i64(parent_id, "parent_id")?)
         .bind(ancestors)
         .bind(name)
         .bind(leader)
         .bind(phone)
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增部门失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_dept(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -509,15 +495,15 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_dept
-            SET dept_name = ?, leader = ?, phone = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET dept_name = $1, leader = $2, phone = $3, status = $4, updated_by = 1
+            WHERE id = $5 AND is_deleted = 0
             "#,
         )
         .bind(name)
         .bind(leader)
         .bind(phone)
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新部门失败: {err}")))?;
@@ -525,22 +511,27 @@ impl MySqlSystemRepository {
     }
 
     async fn list_posts(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, post_name, post_code, post_sort, status
             FROM sys_post
             WHERE is_deleted = 0
-              AND (? = '' OR post_name LIKE ? OR post_code LIKE ?)
-            ORDER BY id DESC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询岗位失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (post_name ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR post_code ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询岗位失败: {err}")))?;
         Ok(rows.into_iter().map(map_post_row).collect())
     }
 
@@ -549,11 +540,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, post_name, post_code, post_sort, status
             FROM sys_post
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询岗位失败: {err}")))?;
@@ -566,22 +557,23 @@ impl MySqlSystemRepository {
         let sort = optional_i32(payload, "sort").unwrap_or(1);
         let status = enabled_status(payload.get("status"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_post (
                 post_code, post_name, post_sort, status,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, ?, 1, 1, 0)
+            ) VALUES ($1, $2, $3, $4, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(code)
         .bind(name)
         .bind(sort)
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增岗位失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_post(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -593,15 +585,15 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_post
-            SET post_name = ?, post_code = ?, post_sort = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET post_name = $1, post_code = $2, post_sort = $3, status = $4, updated_by = 1
+            WHERE id = $5 AND is_deleted = 0
             "#,
         )
         .bind(name)
         .bind(code)
         .bind(sort)
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新岗位失败: {err}")))?;
@@ -609,25 +601,30 @@ impl MySqlSystemRepository {
     }
 
     async fn list_dict_data(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT d.id, t.dict_type, d.label, d.value, d.status
             FROM sys_dict_data d
             INNER JOIN sys_dict_type t ON d.dict_type_id = t.id
-            WHERE d.is_deleted = 0
-              AND t.is_deleted = 0
-              AND (? = '' OR t.dict_type LIKE ? OR d.label LIKE ? OR d.value LIKE ?)
-            ORDER BY d.id DESC
+            WHERE d.is_deleted = 0 AND t.is_deleted = 0
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询字典失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (t.dict_type ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR d.label ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR d.value ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY d.id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询字典失败: {err}")))?;
         Ok(rows.into_iter().map(map_dict_row).collect())
     }
 
@@ -637,11 +634,11 @@ impl MySqlSystemRepository {
             SELECT d.id, t.dict_type, d.label, d.value, d.status
             FROM sys_dict_data d
             INNER JOIN sys_dict_type t ON d.dict_type_id = t.id
-            WHERE d.id = ? AND d.is_deleted = 0 AND t.is_deleted = 0
+            WHERE d.id = $1 AND d.is_deleted = 0 AND t.is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询字典失败: {err}")))?;
@@ -655,22 +652,23 @@ impl MySqlSystemRepository {
         let status = enabled_status(payload.get("status"));
         let dict_type_id = self.ensure_dict_type_id(&dict_type).await?;
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_dict_data (
                 dict_type_id, label, value, status, sort,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, ?, 0, 1, 1, 0)
+            ) VALUES ($1, $2, $3, $4, 0, 1, 1, 0)
+            RETURNING id
             "#,
         )
-        .bind(dict_type_id)
+        .bind(to_i64(dict_type_id, "dict_type_id")?)
         .bind(label)
         .bind(value)
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增字典失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_dict_data(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -683,15 +681,15 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_dict_data
-            SET dict_type_id = ?, label = ?, value = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET dict_type_id = $1, label = $2, value = $3, status = $4, updated_by = 1
+            WHERE id = $5 AND is_deleted = 0
             "#,
         )
-        .bind(dict_type_id)
+        .bind(to_i64(dict_type_id, "dict_type_id")?)
         .bind(label)
         .bind(value)
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新字典失败: {err}")))?;
@@ -699,23 +697,29 @@ impl MySqlSystemRepository {
     }
 
     async fn list_configs(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
             SELECT id, config_key, config_value, remark, status
             FROM sys_config
             WHERE is_deleted = 0
-              AND (? = '' OR config_key LIKE ? OR config_value LIKE ? OR remark LIKE ?)
-            ORDER BY id DESC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询参数失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (config_key ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR config_value ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR remark ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询参数失败: {err}")))?;
         Ok(rows.into_iter().map(map_config_row).collect())
     }
 
@@ -724,11 +728,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT id, config_key, config_value, remark, status
             FROM sys_config
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询参数失败: {err}")))?;
@@ -741,12 +745,13 @@ impl MySqlSystemRepository {
         let remark = optional_string(payload, "remark");
         let status = enabled_status(payload.get("status"));
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_config (
                 config_name, config_key, config_value, config_type, status, remark,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, ?, 0, ?, ?, 1, 1, 0)
+            ) VALUES ($1, $2, $3, 0, $4, $5, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(&name)
@@ -754,10 +759,10 @@ impl MySqlSystemRepository {
         .bind(value)
         .bind(status)
         .bind(remark)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增参数失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_config(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -769,8 +774,8 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_config
-            SET config_name = ?, config_key = ?, config_value = ?, status = ?, remark = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET config_name = $1, config_key = $2, config_value = $3, status = $4, remark = $5, updated_by = 1
+            WHERE id = $6 AND is_deleted = 0
             "#,
         )
         .bind(&name)
@@ -778,7 +783,7 @@ impl MySqlSystemRepository {
         .bind(value)
         .bind(status)
         .bind(remark)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新参数失败: {err}")))?;
@@ -786,37 +791,42 @@ impl MySqlSystemRepository {
     }
 
     async fn list_notices(&self, keyword: Option<&str>) -> Result<Vec<CrudRecord>, AppError> {
-        let (kw, like) = keyword_args(keyword);
-        let rows = sqlx::query(
+        let mut qb = QueryBuilder::<Postgres>::new(
             r#"
-            SELECT n.id, n.title, n.notice_type, n.status, IFNULL(u.username, '') AS publisher
+            SELECT n.id, n.title, n.notice_type, n.status, COALESCE(u.username, '') AS publisher
             FROM sys_notice n
             LEFT JOIN sys_user u ON n.published_by = u.id
             WHERE n.is_deleted = 0
-              AND (? = '' OR n.title LIKE ? OR IFNULL(u.username, '') LIKE ?)
-            ORDER BY n.id DESC
             "#,
-        )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .fetch_all(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("查询公告失败: {err}")))?;
+        );
+        if let Some(like) = keyword_like(keyword) {
+            qb.push(" AND (n.title ILIKE ")
+                .push_bind(like.clone())
+                .push(" OR COALESCE(u.username, '') ILIKE ")
+                .push_bind(like.clone())
+                .push(")");
+        }
+        qb.push(" ORDER BY n.id DESC");
+
+        let rows = qb
+            .build()
+            .fetch_all(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("查询公告失败: {err}")))?;
         Ok(rows.into_iter().map(map_notice_row).collect())
     }
 
     async fn get_notice_by_id(&self, id: u64) -> Result<Option<CrudRecord>, AppError> {
         let row = sqlx::query(
             r#"
-            SELECT n.id, n.title, n.notice_type, n.status, IFNULL(u.username, '') AS publisher
+            SELECT n.id, n.title, n.notice_type, n.status, COALESCE(u.username, '') AS publisher
             FROM sys_notice n
             LEFT JOIN sys_user u ON n.published_by = u.id
-            WHERE n.id = ? AND n.is_deleted = 0
+            WHERE n.id = $1 AND n.is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询公告失败: {err}")))?;
@@ -832,24 +842,25 @@ impl MySqlSystemRepository {
             .resolve_user_id_by_username(publisher_username.as_deref())
             .await?;
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_notice (
                 title, notice_type, summary, content, status, published_by, published_at,
                 created_by, updated_by, is_deleted
-            ) VALUES (?, ?, '', ?, ?, ?, IF(? = 1, NOW(3), NULL), 1, 1, 0)
+            ) VALUES ($1, $2, '', $3, $4, $5, CASE WHEN $6 = 1 THEN CURRENT_TIMESTAMP(3) ELSE NULL END, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(&title)
         .bind(notice_type)
         .bind(format!("{title}\n（由系统管理页创建）"))
         .bind(status)
-        .bind(publisher_id)
+        .bind(publisher_id.map(|id| id as i64))
         .bind(status)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增公告失败: {err}")))?;
-        Ok(result.last_insert_id())
+        Ok(created_id as u64)
     }
 
     async fn update_notice(&self, id: u64, payload: &CrudRecord) -> Result<bool, AppError> {
@@ -864,18 +875,18 @@ impl MySqlSystemRepository {
         let result = sqlx::query(
             r#"
             UPDATE sys_notice
-            SET title = ?, notice_type = ?, content = ?, status = ?, published_by = ?,
-                published_at = IF(? = 1, NOW(3), NULL), updated_by = 1
-            WHERE id = ? AND is_deleted = 0
+            SET title = $1, notice_type = $2, content = $3, status = $4, published_by = $5,
+                published_at = CASE WHEN $6 = 1 THEN CURRENT_TIMESTAMP(3) ELSE NULL END, updated_by = 1
+            WHERE id = $7 AND is_deleted = 0
             "#,
         )
         .bind(&title)
         .bind(notice_type)
         .bind(format!("{title}\n（由系统管理页更新）"))
         .bind(status)
-        .bind(publisher_id)
+        .bind(publisher_id.map(|id| id as i64))
         .bind(status)
-        .bind(id)
+        .bind(to_i64(id, "id")?)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("更新公告失败: {err}")))?;
@@ -891,10 +902,10 @@ impl MySqlSystemRepository {
             r#"
             SELECT COUNT(1)
             FROM sys_menu
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             "#,
         )
-        .bind(parent_id)
+        .bind(to_i64(parent_id, "parent_id")?)
         .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询上级菜单失败: {err}")))?;
@@ -902,7 +913,6 @@ impl MySqlSystemRepository {
         if exists == 0 {
             return Err(AppError::bad_request("上级菜单不存在"));
         }
-
         Ok(())
     }
 
@@ -915,11 +925,11 @@ impl MySqlSystemRepository {
             r#"
             SELECT ancestors
             FROM sys_dept
-            WHERE id = ? AND is_deleted = 0
+            WHERE id = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
-        .bind(parent_id)
+        .bind(to_i64(parent_id, "parent_id")?)
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询上级部门失败: {err}")))?;
@@ -936,15 +946,14 @@ impl MySqlSystemRepository {
         } else {
             parent_ancestors
         };
-
         Ok(format!("{normalized},{parent_id}"))
     }
 
     async fn ensure_dict_type_id(&self, dict_type: &str) -> Result<u64, AppError> {
-        let found = sqlx::query_scalar::<_, u64>(
+        let found = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT id FROM sys_dict_type
-            WHERE dict_type = ? AND is_deleted = 0
+            WHERE dict_type = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
@@ -954,21 +963,23 @@ impl MySqlSystemRepository {
         .map_err(|err| AppError::internal(format!("查询字典类型失败: {err}")))?;
 
         if let Some(id) = found {
-            return Ok(id);
+            return Ok(id as u64);
         }
 
-        let result = sqlx::query(
+        let created_id = sqlx::query_scalar::<_, i64>(
             r#"
             INSERT INTO sys_dict_type (dict_name, dict_type, status, created_by, updated_by, is_deleted)
-            VALUES (?, ?, 1, 1, 1, 0)
+            VALUES ($1, $2, 1, 1, 1, 0)
+            RETURNING id
             "#,
         )
         .bind(dict_type)
         .bind(dict_type)
-        .execute(&self.pool)
+        .fetch_one(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("创建字典类型失败: {err}")))?;
-        Ok(result.last_insert_id())
+
+        Ok(created_id as u64)
     }
 
     async fn resolve_user_id_by_username(
@@ -978,16 +989,15 @@ impl MySqlSystemRepository {
         let Some(username) = username else {
             return Ok(None);
         };
-
         if username.trim().is_empty() {
             return Ok(None);
         }
 
-        let user_id = sqlx::query_scalar::<_, u64>(
+        let user_id = sqlx::query_scalar::<_, i64>(
             r#"
             SELECT id
             FROM sys_user
-            WHERE username = ? AND is_deleted = 0
+            WHERE username = $1 AND is_deleted = 0
             LIMIT 1
             "#,
         )
@@ -995,26 +1005,26 @@ impl MySqlSystemRepository {
         .fetch_optional(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询发布人失败: {err}")))?;
-        Ok(user_id)
+        Ok(user_id.map(|value| value as u64))
     }
 }
 
 #[async_trait]
-impl SystemRepository for MySqlSystemRepository {
+impl SystemRepository for PostgresSystemRepository {
     async fn list(
         &self,
         resource: &str,
         keyword: Option<&str>,
     ) -> Result<Vec<CrudRecord>, AppError> {
-        MySqlSystemRepository::list(self, resource, keyword).await
+        PostgresSystemRepository::list(self, resource, keyword).await
     }
 
     async fn get_by_id(&self, resource: &str, id: u64) -> Result<Option<CrudRecord>, AppError> {
-        MySqlSystemRepository::get_by_id(self, resource, id).await
+        PostgresSystemRepository::get_by_id(self, resource, id).await
     }
 
     async fn create(&self, resource: &str, payload: CrudRecord) -> Result<CrudRecord, AppError> {
-        MySqlSystemRepository::create(self, resource, payload).await
+        PostgresSystemRepository::create(self, resource, payload).await
     }
 
     async fn update(
@@ -1023,18 +1033,25 @@ impl SystemRepository for MySqlSystemRepository {
         id: u64,
         payload: CrudRecord,
     ) -> Result<Option<CrudRecord>, AppError> {
-        MySqlSystemRepository::update(self, resource, id, payload).await
+        PostgresSystemRepository::update(self, resource, id, payload).await
     }
 
     async fn delete(&self, resource: &str, id: u64) -> Result<bool, AppError> {
-        MySqlSystemRepository::delete(self, resource, id).await
+        PostgresSystemRepository::delete(self, resource, id).await
     }
 }
 
-fn keyword_args(keyword: Option<&str>) -> (String, String) {
-    let kw = keyword.unwrap_or_default().trim().to_string();
-    let like = format!("%{kw}%");
-    (kw, like)
+fn to_i64(value: u64, field: &str) -> Result<i64, AppError> {
+    i64::try_from(value).map_err(|_| AppError::bad_request(format!("{field} 超出范围")))
+}
+
+fn keyword_like(keyword: Option<&str>) -> Option<String> {
+    let kw = keyword.unwrap_or_default().trim();
+    if kw.is_empty() {
+        None
+    } else {
+        Some(format!("%{kw}%"))
+    }
 }
 
 fn required_string(payload: &CrudRecord, key: &str, label: &str) -> Result<String, AppError> {
@@ -1080,14 +1097,14 @@ fn optional_u64(payload: &CrudRecord, key: &str) -> Option<u64> {
     })
 }
 
-fn enabled_status(value: Option<&Value>) -> i8 {
+fn enabled_status(value: Option<&Value>) -> i16 {
     match value.and_then(Value::as_str) {
         Some("disabled") => 0,
         _ => 1,
     }
 }
 
-fn enabled_status_label(value: i8) -> &'static str {
+fn enabled_status_label(value: i16) -> &'static str {
     if value == 1 {
         "enabled"
     } else {
@@ -1095,14 +1112,14 @@ fn enabled_status_label(value: i8) -> &'static str {
     }
 }
 
-fn visible_status(value: Option<&Value>) -> i8 {
+fn visible_status(value: Option<&Value>) -> i16 {
     match value.and_then(Value::as_str) {
         Some("no") => 0,
         _ => 1,
     }
 }
 
-fn visible_label(value: i8) -> &'static str {
+fn visible_label(value: i16) -> &'static str {
     if value == 1 {
         "yes"
     } else {
@@ -1110,14 +1127,14 @@ fn visible_label(value: i8) -> &'static str {
     }
 }
 
-fn notice_type(value: Option<&Value>) -> i8 {
+fn notice_type(value: Option<&Value>) -> i16 {
     match value.and_then(Value::as_str) {
         Some("公告") => 2,
         _ => 1,
     }
 }
 
-fn notice_type_label(value: i8) -> &'static str {
+fn notice_type_label(value: i16) -> &'static str {
     if value == 2 {
         "公告"
     } else {
@@ -1125,7 +1142,7 @@ fn notice_type_label(value: i8) -> &'static str {
     }
 }
 
-fn notice_status(value: Option<&Value>) -> i8 {
+fn notice_status(value: Option<&Value>) -> i16 {
     match value.and_then(Value::as_str) {
         Some("published") => 1,
         Some("offline") => 2,
@@ -1133,7 +1150,7 @@ fn notice_status(value: Option<&Value>) -> i8 {
     }
 }
 
-fn notice_status_label(value: i8) -> &'static str {
+fn notice_status_label(value: i16) -> &'static str {
     match value {
         1 => "published",
         2 => "offline",
@@ -1141,9 +1158,12 @@ fn notice_status_label(value: i8) -> &'static str {
     }
 }
 
-fn map_user_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_user_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "username".to_string(),
         Value::from(row.get::<String, _>("username")),
@@ -1158,14 +1178,17 @@ fn map_user_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_role_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_role_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "name".to_string(),
         Value::from(row.get::<String, _>("role_name")),
@@ -1180,17 +1203,20 @@ fn map_role_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_menu_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_menu_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "parent_id".to_string(),
-        Value::from(row.get::<u64, _>("parent_id")),
+        Value::from(row.get::<i64, _>("parent_id") as u64),
     );
     record.insert(
         "name".to_string(),
@@ -1212,17 +1238,20 @@ fn map_menu_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "visible".to_string(),
-        Value::from(visible_label(row.get::<i8, _>("is_visible"))),
+        Value::from(visible_label(row.get::<i16, _>("is_visible"))),
     );
     record
 }
 
-fn map_dept_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_dept_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "parent_id".to_string(),
-        Value::from(row.get::<u64, _>("parent_id")),
+        Value::from(row.get::<i64, _>("parent_id") as u64),
     );
     record.insert(
         "name".to_string(),
@@ -1238,14 +1267,17 @@ fn map_dept_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_post_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_post_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "name".to_string(),
         Value::from(row.get::<String, _>("post_name")),
@@ -1260,14 +1292,17 @@ fn map_post_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_dict_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_dict_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "type".to_string(),
         Value::from(row.get::<String, _>("dict_type")),
@@ -1282,14 +1317,17 @@ fn map_dict_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_config_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_config_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "name".to_string(),
         Value::from(row.get::<String, _>("config_key")),
@@ -1304,29 +1342,36 @@ fn map_config_row(row: MySqlRow) -> CrudRecord {
     );
     record.insert(
         "status".to_string(),
-        Value::from(enabled_status_label(row.get::<i8, _>("status"))),
+        Value::from(enabled_status_label(row.get::<i16, _>("status"))),
     );
     record
 }
 
-fn map_notice_row(row: MySqlRow) -> CrudRecord {
-    let mut record = CrudRecord::new();
-    record.insert("id".to_string(), Value::from(row.get::<u64, _>("id")));
+fn map_notice_row(row: PgRow) -> CrudRecord {
+    let mut record = Map::new();
+    record.insert(
+        "id".to_string(),
+        Value::from(row.get::<i64, _>("id") as u64),
+    );
     record.insert(
         "title".to_string(),
         Value::from(row.get::<String, _>("title")),
     );
     record.insert(
         "type".to_string(),
-        Value::from(notice_type_label(row.get::<i8, _>("notice_type"))),
+        Value::from(notice_type_label(row.get::<i16, _>("notice_type"))),
     );
     record.insert(
         "status".to_string(),
-        Value::from(notice_status_label(row.get::<i8, _>("status"))),
+        Value::from(notice_status_label(row.get::<i16, _>("status"))),
     );
     record.insert(
         "publisher".to_string(),
         Value::from(row.get::<String, _>("publisher")),
     );
     record
+}
+
+pub fn supports_resource(resource: &str) -> bool {
+    SUPPORTED_RESOURCES.contains(&resource)
 }

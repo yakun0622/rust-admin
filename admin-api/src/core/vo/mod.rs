@@ -1,7 +1,7 @@
 use serde::Serialize;
 
-pub mod auth;
 pub mod ai;
+pub mod auth;
 pub mod dashboard;
 pub mod log;
 pub mod monitor;

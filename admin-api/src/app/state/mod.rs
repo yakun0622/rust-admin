@@ -1,22 +1,29 @@
 use std::{sync::Arc, time::Duration};
 
 use anyhow::Context;
-use sqlx::{mysql::MySqlPoolOptions, MySqlPool};
+use sqlx::{mysql::MySqlPoolOptions, postgres::PgPoolOptions};
 
-use crate::core::config::AppConfig;
+mod repository_factory;
+
+use crate::core::{
+    config::{AppConfig, DatabaseDriver},
+    db::DbPool,
+};
 use crate::modules::{
     ai::{repository::InMemoryAiRepository, service::AiService},
-    auth::{repository::MySqlAuthRepository, service::AuthService},
+    auth::service::AuthService,
     dashboard::{repository::MockDashboardRepository, service::DashboardService},
-    log::{repository::MySqlLogRepository, service::LogService},
+    log::service::LogService,
     monitor::{repository::InMemoryMonitorRepository, service::MonitorService},
-    system::{repository::MySqlSystemRepository, service::SystemService},
+    system::service::SystemService,
 };
+
+use self::repository_factory::build_repository_bundle;
 
 #[derive(Clone)]
 pub struct AppState {
     pub config: Arc<AppConfig>,
-    pub mysql_pool: MySqlPool,
+    pub db_pool: DbPool,
     pub redis_client: redis::Client,
     pub auth_service: AuthService,
     pub dashboard_service: DashboardService,
@@ -28,16 +35,31 @@ pub struct AppState {
 
 impl AppState {
     pub async fn new(config: AppConfig) -> anyhow::Result<Self> {
-        let mysql_pool = MySqlPoolOptions::new()
-            .max_connections(config.mysql.max_connections)
-            .min_connections(config.mysql.min_connections)
-            .acquire_timeout(Duration::from_secs(config.mysql.acquire_timeout_secs))
-            .connect(&config.mysql.url)
-            .await
-            .context("failed to connect mysql")?;
+        let db_pool = match config.database.driver {
+            DatabaseDriver::MySql => {
+                let pool = MySqlPoolOptions::new()
+                    .max_connections(config.database.max_connections)
+                    .min_connections(config.database.min_connections)
+                    .acquire_timeout(Duration::from_secs(config.database.acquire_timeout_secs))
+                    .connect(&config.database.url)
+                    .await
+                    .context("failed to connect mysql")?;
+                DbPool::MySql(pool)
+            }
+            DatabaseDriver::Postgres => {
+                let pool = PgPoolOptions::new()
+                    .max_connections(config.database.max_connections)
+                    .min_connections(config.database.min_connections)
+                    .acquire_timeout(Duration::from_secs(config.database.acquire_timeout_secs))
+                    .connect(&config.database.url)
+                    .await
+                    .context("failed to connect postgres")?;
+                DbPool::Postgres(pool)
+            }
+        };
 
-        let redis_client =
-            redis::Client::open(config.redis.url.as_str()).context("failed to create redis client")?;
+        let redis_client = redis::Client::open(config.redis.url.as_str())
+            .context("failed to create redis client")?;
 
         {
             let mut conn = tokio::time::timeout(
@@ -53,23 +75,22 @@ impl AppState {
                 .await
                 .context("failed to ping redis")?;
             if pong != "PONG" {
-                return Err(anyhow::anyhow!("redis ping returned unexpected result: {pong}"));
+                return Err(anyhow::anyhow!(
+                    "redis ping returned unexpected result: {pong}"
+                ));
             }
         }
 
-        let auth_repo = MySqlAuthRepository::new(mysql_pool.clone());
+        let repositories = build_repository_bundle(config.database.driver, &db_pool)?;
         let dashboard_repo = MockDashboardRepository::new_arc();
-        let system_repo = MySqlSystemRepository::new(mysql_pool.clone());
-        let log_repo = MySqlLogRepository::new(mysql_pool.clone());
         let monitor_repo = InMemoryMonitorRepository::seeded();
         let ai_repo = InMemoryAiRepository::seeded();
         let jwt_secret = config.security.jwt_secret.clone();
         let jwt_expires_secs = config.security.jwt_expires_secs;
-        let mysql_pool_for_auth = mysql_pool.clone();
 
         let monitor_service = MonitorService::new(
             monitor_repo,
-            mysql_pool.clone(),
+            db_pool.clone(),
             redis_client.clone(),
             Arc::new(config.clone()),
         );
@@ -77,28 +98,19 @@ impl AppState {
 
         Ok(Self {
             config: Arc::new(config),
-            mysql_pool,
+            db_pool,
             redis_client,
-            auth_service: AuthService::new(
-                auth_repo,
-                jwt_secret,
-                jwt_expires_secs,
-                mysql_pool_for_auth,
-            ),
+            auth_service: AuthService::new(repositories.auth_repo, jwt_secret, jwt_expires_secs),
             dashboard_service: DashboardService::new(dashboard_repo),
-            system_service: SystemService::new(system_repo),
-            log_service: LogService::new(log_repo),
+            system_service: SystemService::new(repositories.system_repo),
+            log_service: LogService::new(repositories.log_repo),
             monitor_service,
             ai_service: AiService::new(ai_repo),
         })
     }
 
-    pub async fn mysql_ping(&self) -> anyhow::Result<()> {
-        let _: i32 = sqlx::query_scalar("SELECT 1")
-            .fetch_one(&self.mysql_pool)
-            .await
-            .context("mysql ping query failed")?;
-        Ok(())
+    pub async fn db_ping(&self) -> anyhow::Result<()> {
+        self.db_pool.ping().await
     }
 
     pub async fn redis_ping(&self) -> anyhow::Result<()> {
@@ -115,7 +127,9 @@ impl AppState {
             .await
             .context("failed to ping redis")?;
         if pong != "PONG" {
-            return Err(anyhow::anyhow!("redis ping returned unexpected result: {pong}"));
+            return Err(anyhow::anyhow!(
+                "redis ping returned unexpected result: {pong}"
+            ));
         }
         Ok(())
     }

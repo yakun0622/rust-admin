@@ -11,8 +11,8 @@ use crate::{
         errors::AppError,
         response::ApiResponse,
         vo::monitor::{
-            CacheNamespaceListVo, CacheSearchVo, DatasourceOverviewVo, JobActionVo, JobItemVo, JobListVo,
-            OnlineUserListVo, ServerOverviewVo,
+            CacheNamespaceListVo, CacheSearchVo, DatasourceOverviewVo, JobActionVo, JobItemVo,
+            JobListVo, OnlineUserListVo, ServerOverviewVo,
         },
     },
 };
@@ -36,7 +36,10 @@ async fn list_online(
     Query(query): Query<MonitorListQueryDto>,
 ) -> Json<ApiResponse<OnlineUserListVo>> {
     Json(ApiResponse::success(
-        state.monitor_service.list_online_users(query.keyword.as_deref()).await,
+        state
+            .monitor_service
+            .list_online_users(query.keyword.as_deref())
+            .await,
     ))
 }
 
@@ -45,7 +48,10 @@ async fn list_jobs(
     Query(query): Query<MonitorListQueryDto>,
 ) -> Json<ApiResponse<JobListVo>> {
     Json(ApiResponse::success(
-        state.monitor_service.list_jobs(query.keyword.as_deref()).await,
+        state
+            .monitor_service
+            .list_jobs(query.keyword.as_deref())
+            .await,
     ))
 }
 

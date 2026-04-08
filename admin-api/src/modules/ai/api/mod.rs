@@ -17,7 +17,10 @@ use crate::{
 pub fn router() -> Router<AppState> {
     Router::new()
         .route("/sessions", get(list_sessions).post(create_session))
-        .route("/sessions/{session_id}/messages", get(list_messages).post(send_message))
+        .route(
+            "/sessions/{session_id}/messages",
+            get(list_messages).post(send_message),
+        )
 }
 
 async fn list_sessions(State(state): State<AppState>) -> Json<ApiResponse<AiSessionListVo>> {
