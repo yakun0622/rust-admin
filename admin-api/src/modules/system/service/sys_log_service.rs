@@ -1,19 +1,24 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use shaku::Component;
+
 use crate::core::{
     errors::AppError,
     vo::log_vo::{LoginLogItemVo, LoginLogListVo, OperLogItemVo, OperLogListVo},
 };
-use crate::modules::system::repository::SysLogRepository;
+use crate::modules::system::repository::interface::ISysLogRepository;
 
-#[derive(Clone)]
+use super::interface::ISysLogService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysLogService)]
 pub struct SysLogService {
-    repo: SysLogRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysLogRepository>,
 }
 
 impl SysLogService {
-    pub(crate) fn new(repo: SysLogRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list_oper(&self, keyword: Option<&str>) -> Result<OperLogListVo, AppError> {
         let items = self
             .repo
@@ -60,5 +65,16 @@ impl SysLogService {
             total: items.len(),
             items,
         })
+    }
+}
+
+#[async_trait]
+impl ISysLogService for SysLogService {
+    async fn list_oper(&self, keyword: Option<&str>) -> Result<OperLogListVo, AppError> {
+        self.list_oper(keyword).await
+    }
+
+    async fn list_login(&self, keyword: Option<&str>) -> Result<LoginLogListVo, AppError> {
+        self.list_login(keyword).await
     }
 }

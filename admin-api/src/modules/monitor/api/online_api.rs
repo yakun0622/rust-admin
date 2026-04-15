@@ -7,7 +7,8 @@ use axum::{
 use crate::{
     app::state::AppState,
     core::{
-        dto::monitor_dto::MonitorListQueryDto, response::ApiResponse, vo::monitor_vo::OnlineUserListVo,
+        dto::monitor_dto::MonitorListQueryDto, response::ApiResponse,
+        vo::monitor_vo::OnlineUserListVo,
     },
 };
 

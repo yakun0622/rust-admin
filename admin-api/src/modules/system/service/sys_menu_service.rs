@@ -1,21 +1,26 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use shaku::Component;
+
 use crate::core::{
     converter::sys_menu_converter::{from_create_dto, from_update_dto, to_sys_menu_vo},
     dto::sys_menu_dto::{SysMenuCreateReqDto, SysMenuUpdateReqDto},
     errors::AppError,
     vo::sys_menu_vo::{SysMenuListVo, SysMenuVo},
 };
-use crate::modules::system::repository::SysMenuRepository;
+use crate::modules::system::repository::interface::ISysMenuRepository;
 
-#[derive(Clone)]
+use super::interface::ISysMenuService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysMenuService)]
 pub struct SysMenuService {
-    repo: SysMenuRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysMenuRepository>,
 }
 
 impl SysMenuService {
-    pub(crate) fn new(repo: SysMenuRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
         let items = self
             .repo
@@ -82,6 +87,25 @@ impl SysMenuService {
             )));
         }
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl ISysMenuService for SysMenuService {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn create(&self, dto: SysMenuCreateReqDto) -> Result<SysMenuVo, AppError> {
+        self.create(dto).await
+    }
+
+    async fn update_by_id(&self, id: u64, dto: SysMenuUpdateReqDto) -> Result<SysMenuVo, AppError> {
+        self.update_by_id(id, dto).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }
 

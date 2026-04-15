@@ -30,7 +30,7 @@ async fn oper_logs(
 ) -> Result<Json<ApiResponse<OperLogListVo>>, AppError> {
     Ok(Json(ApiResponse::success(
         state
-            .sys_log_service
+            .log_service()
             .list_oper(query.keyword.as_deref())
             .await?,
     )))
@@ -42,7 +42,7 @@ async fn login_logs(
 ) -> Result<Json<ApiResponse<LoginLogListVo>>, AppError> {
     Ok(Json(ApiResponse::success(
         state
-            .sys_log_service
+            .log_service()
             .list_login(query.keyword.as_deref())
             .await?,
     )))

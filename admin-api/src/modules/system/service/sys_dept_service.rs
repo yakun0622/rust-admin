@@ -1,21 +1,26 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use shaku::Component;
+
 use crate::core::{
     converter::sys_dept_converter::{from_create_dto, from_update_dto, to_sys_dept_vo},
     dto::sys_dept_dto::{SysDeptCreateReqDto, SysDeptUpdateReqDto},
     errors::AppError,
     vo::sys_dept_vo::{SysDeptListVo, SysDeptVo},
 };
-use crate::modules::system::repository::SysDeptRepository;
+use crate::modules::system::repository::interface::ISysDeptRepository;
 
-#[derive(Clone)]
+use super::interface::ISysDeptService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysDeptService)]
 pub struct SysDeptService {
-    repo: SysDeptRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysDeptRepository>,
 }
 
 impl SysDeptService {
-    pub(crate) fn new(repo: SysDeptRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list(&self, keyword: Option<&str>) -> Result<SysDeptListVo, AppError> {
         let items = self
             .repo
@@ -81,6 +86,25 @@ impl SysDeptService {
             )));
         }
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl ISysDeptService for SysDeptService {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysDeptListVo, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn create(&self, dto: SysDeptCreateReqDto) -> Result<SysDeptVo, AppError> {
+        self.create(dto).await
+    }
+
+    async fn update_by_id(&self, id: u64, dto: SysDeptUpdateReqDto) -> Result<SysDeptVo, AppError> {
+        self.update_by_id(id, dto).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }
 

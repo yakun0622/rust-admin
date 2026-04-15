@@ -28,7 +28,7 @@ async fn list(
     State(state): State<AppState>,
     Query(query): Query<SysMenuListQueryDto>,
 ) -> Result<Json<ApiResponse<SysMenuListVo>>, AppError> {
-    let service = state.sys_menu_service.clone();
+    let service = state.menu_service();
     let data = service.list(query.keyword.as_deref()).await?;
     Ok(Json(ApiResponse::success(data)))
 }
@@ -37,7 +37,7 @@ async fn create(
     State(state): State<AppState>,
     Json(payload): Json<SysMenuCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysMenuRecordVo>>, AppError> {
-    let service = state.sys_menu_service.clone();
+    let service = state.menu_service();
     let item = service.create(payload).await?;
     Ok(Json(ApiResponse::success(SysMenuRecordVo { item })))
 }
@@ -47,7 +47,7 @@ async fn update(
     Path(id): Path<u64>,
     Json(payload): Json<SysMenuUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysMenuRecordVo>>, AppError> {
-    let service = state.sys_menu_service.clone();
+    let service = state.menu_service();
     let item = service.update_by_id(id, payload).await?;
     Ok(Json(ApiResponse::success(SysMenuRecordVo { item })))
 }
@@ -56,7 +56,7 @@ async fn remove(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysMenuDeleteVo>>, AppError> {
-    let service = state.sys_menu_service.clone();
+    let service = state.menu_service();
     let deleted = service.delete_by_id(id).await?;
     Ok(Json(ApiResponse::success(SysMenuDeleteVo { id, deleted })))
 }

@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::{MySqlPool, Row};
 
 use crate::core::{errors::AppError, model::system::SysNoticePo};
 
-#[derive(Clone)]
+use super::interface::ISysNoticeRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysNoticeRepository)]
 pub(crate) struct SysNoticeRepository {
     pool: MySqlPool,
 }
 
 impl SysNoticeRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysNoticePo>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         let rows = sqlx::query(
@@ -166,5 +167,42 @@ impl SysNoticeRepository {
         .await
         .map_err(|err| AppError::internal(format!("查询发布人失败: {err}")))?;
         Ok(user_id)
+    }
+}
+
+#[async_trait]
+impl ISysNoticeRepository for SysNoticeRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysNoticePo>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysNoticePo>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(
+        &self,
+        title: &str,
+        notice_type: i16,
+        status: i16,
+        publisher: Option<&str>,
+    ) -> Result<u64, AppError> {
+        self.insert(title, notice_type, status, publisher).await
+    }
+
+    async fn update_by_id(
+        &self,
+        id: u64,
+        title: &str,
+        notice_type: i16,
+        status: i16,
+        publisher: Option<&str>,
+    ) -> Result<bool, AppError> {
+        self.update_by_id(id, title, notice_type, status, publisher)
+            .await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

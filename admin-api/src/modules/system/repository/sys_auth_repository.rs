@@ -1,17 +1,18 @@
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::{query_as, MySqlPool};
 
 use crate::core::{errors::AppError, model::auth::UserCredentialPo};
 
-#[derive(Clone)]
+use super::interface::ISysAuthRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysAuthRepository)]
 pub struct SysAuthRepository {
     pool: MySqlPool,
 }
 
 impl SysAuthRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn find_by_username(
         &self,
         username: &str,
@@ -53,5 +54,24 @@ impl SysAuthRepository {
         .await
         .map_err(|err| AppError::internal(format!("写入登录日志失败: {err}")))?;
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ISysAuthRepository for SysAuthRepository {
+    async fn find_by_username(&self, username: &str) -> Result<Option<UserCredentialPo>, AppError> {
+        self.find_by_username(username).await
+    }
+
+    async fn append_login_log(
+        &self,
+        username: Option<&str>,
+        login_type: i8,
+        status: i8,
+        message: &str,
+        ip: &str,
+    ) -> Result<(), AppError> {
+        self.append_login_log(username, login_type, status, message, ip)
+            .await
     }
 }

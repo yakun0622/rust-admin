@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_config::SysConfigModel};
 
-#[derive(Clone)]
+use super::interface::ISysConfigRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysConfigRepository)]
 pub(crate) struct SysConfigRepository {
     pool: MySqlPool,
 }
 
 impl SysConfigRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(
         &self,
         keyword: Option<&str>,
@@ -108,5 +109,28 @@ impl SysConfigRepository {
         .await
         .map_err(|err| AppError::internal(format!("删除配置失败: {err}")))?;
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[async_trait]
+impl ISysConfigRepository for SysConfigRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysConfigModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysConfigModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysConfigModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysConfigModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

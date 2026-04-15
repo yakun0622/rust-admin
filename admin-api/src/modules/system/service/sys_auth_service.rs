@@ -3,17 +3,21 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
+use async_trait::async_trait;
 use bcrypt::verify;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
 use serde::{Deserialize, Serialize};
+use shaku::Component;
 
 use crate::{
     core::{
         converter::auth_converter::to_login_vo, dto::auth_dto::LoginReqDto, errors::AppError,
         model::auth::UserCredentialPo, vo::auth_vo::LoginVo,
     },
-    modules::system::repository::SysAuthRepository,
+    modules::system::repository::interface::ISysAuthRepository,
 };
+
+use super::interface::ISysAuthService;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JwtClaims {
@@ -23,22 +27,16 @@ pub struct JwtClaims {
     pub iat: usize,
 }
 
-#[derive(Clone)]
+#[derive(Component, Clone)]
+#[shaku(interface = ISysAuthService)]
 pub struct SysAuthService {
-    repo: SysAuthRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysAuthRepository>,
     jwt_secret: Arc<String>,
     jwt_expires_secs: u64,
 }
 
 impl SysAuthService {
-    pub(crate) fn new(repo: SysAuthRepository, jwt_secret: String, jwt_expires_secs: u64) -> Self {
-        Self {
-            repo,
-            jwt_secret: Arc::new(jwt_secret),
-            jwt_expires_secs,
-        }
-    }
-
     pub async fn login(
         &self,
         payload: LoginReqDto,
@@ -117,6 +115,21 @@ impl SysAuthService {
             &EncodingKey::from_secret(self.jwt_secret.as_bytes()),
         )
         .map_err(|err| AppError::internal(format!("生成令牌失败: {err}")))
+    }
+}
+
+#[async_trait]
+impl ISysAuthService for SysAuthService {
+    async fn login(
+        &self,
+        payload: LoginReqDto,
+        client_ip: Option<String>,
+    ) -> Result<LoginVo, AppError> {
+        self.login(payload, client_ip).await
+    }
+
+    fn verify_token(&self, token: &str) -> Result<JwtClaims, AppError> {
+        self.verify_token(token)
     }
 }
 

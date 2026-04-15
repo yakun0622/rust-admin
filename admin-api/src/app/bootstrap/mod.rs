@@ -12,11 +12,11 @@ pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let state = AppState::new(cfg.clone()).await?;
 
     let addr = format!("{}:{}", cfg.server.host, cfg.server.port);
-    let listener = TcpListener::bind(&addr)
-        .await
-        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+    let listener = TcpListener::bind(&addr).await.map_err(
+        |e| -> Box<dyn std::error::Error + Send + Sync> {
             format!("failed to bind address {addr}: {e}").into()
-        })?;
+        },
+    )?;
 
     let app = routes::build_router(state);
     info!(

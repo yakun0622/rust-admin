@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_menu::SysMenuModel};
 
-#[derive(Clone)]
+use super::interface::ISysMenuRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysMenuRepository)]
 pub(crate) struct SysMenuRepository {
     pool: MySqlPool,
 }
 
 impl SysMenuRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysMenuModel>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysMenuModel>(
@@ -131,5 +132,28 @@ impl SysMenuRepository {
             return Err(AppError::bad_request("上级菜单不存在"));
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ISysMenuRepository for SysMenuRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysMenuModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysMenuModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysMenuModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysMenuModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

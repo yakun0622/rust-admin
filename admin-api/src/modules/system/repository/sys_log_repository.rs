@@ -1,3 +1,5 @@
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::{MySqlPool, Row};
 
 use crate::core::{
@@ -6,16 +8,15 @@ use crate::core::{
     model::log::{LoginLogPo, OperLogPo},
 };
 
-#[derive(Clone)]
+use super::interface::ISysLogRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysLogRepository)]
 pub struct SysLogRepository {
     pool: MySqlPool,
 }
 
 impl SysLogRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list_oper(
         &self,
         keyword: Option<&str>,
@@ -114,5 +115,16 @@ impl SysLogRepository {
                 login_at: row.get::<i64, _>("login_at_millis"),
             })
             .collect::<Vec<_>>())
+    }
+}
+
+#[async_trait]
+impl ISysLogRepository for SysLogRepository {
+    async fn list_oper(&self, keyword: Option<&str>) -> Result<Vec<OperLogPo>, AppError> {
+        self.list_oper(keyword).await
+    }
+
+    async fn list_login(&self, keyword: Option<&str>) -> Result<Vec<LoginLogPo>, AppError> {
+        self.list_login(keyword).await
     }
 }

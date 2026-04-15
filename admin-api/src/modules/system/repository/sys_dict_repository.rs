@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_dict::SysDictModel};
 
-#[derive(Clone)]
+use super::interface::ISysDictRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysDictRepository)]
 pub(crate) struct SysDictRepository {
     pool: MySqlPool,
 }
 
 impl SysDictRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDictModel>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysDictModel>(
@@ -140,5 +141,28 @@ impl SysDictRepository {
         .await
         .map_err(|err| AppError::internal(format!("创建字典类型失败: {err}")))?;
         Ok(result.last_insert_id())
+    }
+}
+
+#[async_trait]
+impl ISysDictRepository for SysDictRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDictModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysDictModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysDictModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysDictModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

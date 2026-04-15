@@ -2,7 +2,9 @@ use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
 
 use crate::{
     app::state::AppState,
-    core::{dto::auth_dto::LoginReqDto, errors::AppError, response::ApiResponse, vo::auth_vo::LoginVo},
+    core::{
+        dto::auth_dto::LoginReqDto, errors::AppError, response::ApiResponse, vo::auth_vo::LoginVo,
+    },
 };
 
 pub struct SysAuthRouter;
@@ -18,7 +20,7 @@ async fn login(
     headers: HeaderMap,
     Json(payload): Json<LoginReqDto>,
 ) -> Result<Json<ApiResponse<LoginVo>>, AppError> {
-    let service = state.sys_auth_service.clone();
+    let service = state.auth_service();
 
     let login_vo = service.login(payload, extract_client_ip(&headers)).await?;
     Ok(Json(ApiResponse::success(login_vo)))

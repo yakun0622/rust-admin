@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_role::SysRoleModel};
 
-#[derive(Clone)]
+use super::interface::ISysRoleRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysRoleRepository)]
 pub(crate) struct SysRoleRepository {
     pool: MySqlPool,
 }
 
 impl SysRoleRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysRoleModel>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysRoleModel>(
@@ -103,5 +104,28 @@ impl SysRoleRepository {
         .await
         .map_err(|err| AppError::internal(format!("删除角色失败: {err}")))?;
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[async_trait]
+impl ISysRoleRepository for SysRoleRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysRoleModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysRoleModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysRoleModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysRoleModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

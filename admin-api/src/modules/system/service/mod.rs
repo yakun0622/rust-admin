@@ -1,4 +1,5 @@
 pub mod integration;
+pub mod interface;
 
 mod sys_auth_service;
 mod sys_config_service;
@@ -23,3 +24,5 @@ pub use {
     sys_role_service::SysRoleService,
     sys_user_service::SysUserService,
 };
+
+pub(crate) use sys_auth_service::SysAuthServiceParameters;

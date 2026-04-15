@@ -1,24 +1,20 @@
 use std::{sync::Arc, time::Duration};
 
+use shaku::HasComponent;
 use sqlx::mysql::MySqlPoolOptions;
 
-#[allow(unused_imports)]
-use crate::wire;
-
-use crate::core::{config::AppConfig, db::DbPool, errors::AppError};
 use crate::modules::{
     ai::{repository::InMemoryAiRepository, service::AiService},
     dashboard::{repository::MockDashboardRepository, service::DashboardService},
     monitor::{repository::InMemoryMonitorRepository, service::MonitorService},
-    system::repository::{
-        SysAuthRepository, SysConfigRepository, SysDeptRepository, SysDictRepository,
-        SysLogRepository, SysMenuRepository, SysNoticeRepository, SysPostRepository,
-        SysRoleRepository, SysUserRepository,
+    system::service::interface::{
+        ISysAuthService, ISysConfigService, ISysDeptService, ISysDictService, ISysLogService,
+        ISysMenuService, ISysNoticeService, ISysPostService, ISysRoleService, ISysUserService,
     },
-    system::service::{
-        SysAuthService, SysConfigService, SysDeptService, SysDictService, SysLogService,
-        SysMenuService, SysNoticeService, SysPostService, SysRoleService, SysUserService,
-    },
+};
+use crate::{
+    app::container::{build_app_module, AppModule},
+    core::{config::AppConfig, db::DbPool, errors::AppError},
 };
 
 type BoxError = Box<dyn std::error::Error + Send + Sync>;
@@ -28,17 +24,8 @@ pub struct AppState {
     pub config: Arc<AppConfig>,
     pub db_pool: DbPool,
     pub redis_client: redis::Client,
-    pub sys_auth_service: SysAuthService,
+    pub app_module: Arc<AppModule>,
     pub dashboard_service: DashboardService,
-    pub sys_user_service: SysUserService,
-    pub sys_role_service: SysRoleService,
-    pub sys_menu_service: SysMenuService,
-    pub sys_dept_service: SysDeptService,
-    pub sys_post_service: SysPostService,
-    pub sys_dict_service: SysDictService,
-    pub sys_config_service: SysConfigService,
-    pub sys_notice_service: SysNoticeService,
-    pub sys_log_service: SysLogService,
     pub monitor_service: MonitorService,
     pub ai_service: AiService,
 }
@@ -75,25 +62,7 @@ impl AppState {
             }
         }
 
-        // 标准装配：Service[Repo] 全部由 pool 驱动
-        wire!(pool;
-            sys_user_service:   SysUserService[SysUserRepository],
-            sys_role_service:   SysRoleService[SysRoleRepository],
-            sys_menu_service:   SysMenuService[SysMenuRepository],
-            sys_dept_service:   SysDeptService[SysDeptRepository],
-            sys_post_service:   SysPostService[SysPostRepository],
-            sys_dict_service:   SysDictService[SysDictRepository],
-            sys_config_service: SysConfigService[SysConfigRepository],
-            sys_notice_service: SysNoticeService[SysNoticeRepository],
-            sys_log_service:    SysLogService[SysLogRepository],
-        );
-
-        // 需要额外参数的单独处理
-        let sys_auth_service = SysAuthService::new(
-            SysAuthRepository::new(pool.clone()),
-            config.security.jwt_secret.clone(),
-            config.security.jwt_expires_secs,
-        );
+        let app_module = build_app_module(pool.clone(), &config);
 
         let dashboard_repo = MockDashboardRepository::new_arc();
         let monitor_repo = InMemoryMonitorRepository::seeded();
@@ -111,20 +80,51 @@ impl AppState {
             config: Arc::new(config),
             db_pool,
             redis_client,
-            sys_auth_service,
+            app_module,
             dashboard_service: DashboardService::new(dashboard_repo),
-            sys_user_service,
-            sys_role_service,
-            sys_menu_service,
-            sys_dept_service,
-            sys_post_service,
-            sys_dict_service,
-            sys_config_service,
-            sys_notice_service,
-            sys_log_service,
             monitor_service,
             ai_service: AiService::new(ai_repo),
         })
+    }
+
+    pub fn auth_service(&self) -> Arc<dyn ISysAuthService> {
+        self.app_module.resolve()
+    }
+
+    pub fn user_service(&self) -> Arc<dyn ISysUserService> {
+        self.app_module.resolve()
+    }
+
+    pub fn role_service(&self) -> Arc<dyn ISysRoleService> {
+        self.app_module.resolve()
+    }
+
+    pub fn menu_service(&self) -> Arc<dyn ISysMenuService> {
+        self.app_module.resolve()
+    }
+
+    pub fn dept_service(&self) -> Arc<dyn ISysDeptService> {
+        self.app_module.resolve()
+    }
+
+    pub fn post_service(&self) -> Arc<dyn ISysPostService> {
+        self.app_module.resolve()
+    }
+
+    pub fn dict_service(&self) -> Arc<dyn ISysDictService> {
+        self.app_module.resolve()
+    }
+
+    pub fn config_service(&self) -> Arc<dyn ISysConfigService> {
+        self.app_module.resolve()
+    }
+
+    pub fn notice_service(&self) -> Arc<dyn ISysNoticeService> {
+        self.app_module.resolve()
+    }
+
+    pub fn log_service(&self) -> Arc<dyn ISysLogService> {
+        self.app_module.resolve()
     }
 
     pub async fn db_ping(&self) -> Result<(), AppError> {

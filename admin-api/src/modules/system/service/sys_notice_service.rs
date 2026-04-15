@@ -1,4 +1,8 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
 use serde_json::{json, Value};
+use shaku::Component;
 
 use crate::core::{
     dto::system_dto::{SysNoticeCreateReqDto, SysNoticeUpdateReqDto},
@@ -6,18 +10,18 @@ use crate::core::{
     model::system::SysNoticePo,
     vo::system_vo::SystemCrudListVo,
 };
-use crate::modules::system::repository::SysNoticeRepository;
+use crate::modules::system::repository::interface::ISysNoticeRepository;
 
-#[derive(Clone)]
+use super::interface::ISysNoticeService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysNoticeService)]
 pub struct SysNoticeService {
-    repo: SysNoticeRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysNoticeRepository>,
 }
 
 impl SysNoticeService {
-    pub(crate) fn new(repo: SysNoticeRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError> {
         let items = self
             .repo
@@ -82,6 +86,25 @@ impl SysNoticeService {
             )));
         }
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl ISysNoticeService for SysNoticeService {
+    async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn create(&self, dto: SysNoticeCreateReqDto) -> Result<Value, AppError> {
+        self.create(dto).await
+    }
+
+    async fn update_by_id(&self, id: u64, dto: SysNoticeUpdateReqDto) -> Result<Value, AppError> {
+        self.update_by_id(id, dto).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }
 

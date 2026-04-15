@@ -1,21 +1,26 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use shaku::Component;
+
 use crate::core::{
     converter::sys_dict_converter::{from_create_dto, from_update_dto, to_sys_dict_vo},
     dto::sys_dict_dto::{SysDictCreateReqDto, SysDictUpdateReqDto},
     errors::AppError,
     vo::sys_dict_vo::{SysDictListVo, SysDictVo},
 };
-use crate::modules::system::repository::SysDictRepository;
+use crate::modules::system::repository::interface::ISysDictRepository;
 
-#[derive(Clone)]
+use super::interface::ISysDictService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysDictService)]
 pub struct SysDictService {
-    repo: SysDictRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysDictRepository>,
 }
 
 impl SysDictService {
-    pub(crate) fn new(repo: SysDictRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list(&self, keyword: Option<&str>) -> Result<SysDictListVo, AppError> {
         let items = self
             .repo
@@ -70,6 +75,25 @@ impl SysDictService {
             )));
         }
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl ISysDictService for SysDictService {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysDictListVo, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn create(&self, dto: SysDictCreateReqDto) -> Result<SysDictVo, AppError> {
+        self.create(dto).await
+    }
+
+    async fn update_by_id(&self, id: u64, dto: SysDictUpdateReqDto) -> Result<SysDictVo, AppError> {
+        self.update_by_id(id, dto).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }
 

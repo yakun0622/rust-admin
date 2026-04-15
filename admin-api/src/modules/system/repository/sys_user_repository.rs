@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_user::SysUserModel};
 
-#[derive(Clone)]
+use super::interface::ISysUserRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysUserRepository)]
 pub(crate) struct SysUserRepository {
     pool: MySqlPool,
 }
 
 impl SysUserRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserModel>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysUserModel>(
@@ -108,5 +109,28 @@ impl SysUserRepository {
         .await
         .map_err(|err| AppError::internal(format!("删除用户失败: {err}")))?;
         Ok(result.rows_affected() > 0)
+    }
+}
+
+#[async_trait]
+impl ISysUserRepository for SysUserRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysUserModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysUserModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysUserModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

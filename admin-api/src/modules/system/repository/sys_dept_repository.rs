@@ -1,18 +1,19 @@
 use crate::core::dbal::query::fragments;
+use async_trait::async_trait;
+use shaku::Component;
 use sqlx::{MySqlPool, Row};
 
 use crate::core::{errors::AppError, model::sys_dept::SysDeptModel};
 
-#[derive(Clone)]
+use super::interface::ISysDeptRepository;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysDeptRepository)]
 pub(crate) struct SysDeptRepository {
     pool: MySqlPool,
 }
 
 impl SysDeptRepository {
-    pub(crate) fn new(pool: MySqlPool) -> Self {
-        Self { pool }
-    }
-
     pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDeptModel>, AppError> {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysDeptModel>(
@@ -143,5 +144,28 @@ impl SysDeptRepository {
         };
 
         Ok(format!("{normalized},{parent_id}"))
+    }
+}
+
+#[async_trait]
+impl ISysDeptRepository for SysDeptRepository {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDeptModel>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysDeptModel>, AppError> {
+        self.get_by_id(id).await
+    }
+
+    async fn insert(&self, model: &SysDeptModel) -> Result<u64, AppError> {
+        self.insert(model).await
+    }
+
+    async fn update_by_id(&self, id: u64, model: &SysDeptModel) -> Result<bool, AppError> {
+        self.update_by_id(id, model).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }

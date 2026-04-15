@@ -28,7 +28,7 @@ async fn list(
     State(state): State<AppState>,
     Query(query): Query<SysUserListQueryDto>,
 ) -> Result<Json<ApiResponse<SysUserListVo>>, AppError> {
-    let service = state.sys_user_service.clone();
+    let service = state.user_service();
     let items = service.list(query.keyword.as_deref()).await?;
     let total = items.len();
     Ok(Json(ApiResponse::success(SysUserListVo { total, items })))
@@ -38,7 +38,7 @@ async fn create(
     State(state): State<AppState>,
     Json(payload): Json<SysUserCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysUserRecordVo>>, AppError> {
-    let service = state.sys_user_service.clone();
+    let service = state.user_service();
     let item = service.create(payload).await?;
     Ok(Json(ApiResponse::success(SysUserRecordVo { item })))
 }
@@ -48,7 +48,7 @@ async fn update(
     Path(id): Path<u64>,
     Json(payload): Json<SysUserUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysUserRecordVo>>, AppError> {
-    let service = state.sys_user_service.clone();
+    let service = state.user_service();
     let item = service.update_by_id(id, payload).await?;
     Ok(Json(ApiResponse::success(SysUserRecordVo { item })))
 }
@@ -57,7 +57,7 @@ async fn remove(
     State(state): State<AppState>,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysUserDeleteVo>>, AppError> {
-    let service = state.sys_user_service.clone();
+    let service = state.user_service();
     let deleted = service.delete_by_id(id).await?;
     Ok(Json(ApiResponse::success(SysUserDeleteVo { id, deleted })))
 }

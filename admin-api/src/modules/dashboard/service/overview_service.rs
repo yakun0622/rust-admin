@@ -1,4 +1,7 @@
-use crate::{core::converter::dashboard_converter::to_overview_vo, core::vo::dashboard_vo::DashboardOverviewVo};
+use crate::{
+    core::converter::dashboard_converter::to_overview_vo,
+    core::vo::dashboard_vo::DashboardOverviewVo,
+};
 
 use super::DashboardService;
 

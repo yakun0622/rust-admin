@@ -1,21 +1,26 @@
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use shaku::Component;
+
 use crate::core::{
     converter::sys_user_converter::{from_create_dto, from_update_dto, to_sys_user_vo},
     dto::sys_user_dto::{SysUserCreateReqDto, SysUserUpdateReqDto},
     errors::AppError,
     vo::sys_user_vo::SysUserVo,
 };
-use crate::modules::system::repository::{SysUserRepository, DEFAULT_PASSWORD_HASH};
+use crate::modules::system::repository::{interface::ISysUserRepository, DEFAULT_PASSWORD_HASH};
 
-#[derive(Clone)]
+use super::interface::ISysUserService;
+
+#[derive(Component, Clone)]
+#[shaku(interface = ISysUserService)]
 pub struct SysUserService {
-    repo: SysUserRepository,
+    #[shaku(inject)]
+    repo: Arc<dyn ISysUserRepository>,
 }
 
 impl SysUserService {
-    pub(crate) fn new(repo: SysUserRepository) -> Self {
-        Self { repo }
-    }
-
     pub async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError> {
         let normalized_keyword = keyword.and_then(normalize_optional_str);
         let users = self.repo.list(normalized_keyword.as_deref()).await?;
@@ -64,6 +69,25 @@ impl SysUserService {
             )));
         }
         Ok(true)
+    }
+}
+
+#[async_trait]
+impl ISysUserService for SysUserService {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError> {
+        self.list(keyword).await
+    }
+
+    async fn create(&self, dto: SysUserCreateReqDto) -> Result<SysUserVo, AppError> {
+        self.create(dto).await
+    }
+
+    async fn update_by_id(&self, id: u64, dto: SysUserUpdateReqDto) -> Result<SysUserVo, AppError> {
+        self.update_by_id(id, dto).await
+    }
+
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
+        self.delete_by_id(id).await
     }
 }
 
