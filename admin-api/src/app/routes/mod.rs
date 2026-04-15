@@ -1,7 +1,11 @@
 use axum::{extract::State, middleware, routing::get, Json, Router};
 use serde_json::{json, Value};
 
-use crate::{app::state::AppState, middleware::auth::require_auth, modules};
+use crate::{
+    app::state::AppState,
+    middleware::{auth::require_auth, request_log::log_api_request},
+    modules,
+};
 
 pub fn build_router(state: AppState) -> Router {
     let protected_api = modules::protected_router()
@@ -11,6 +15,7 @@ pub fn build_router(state: AppState) -> Router {
         .route("/health", get(health))
         .nest("/api", modules::public_router())
         .nest("/api", protected_api)
+        .layer(middleware::from_fn(log_api_request))
         .with_state(state)
 }
 

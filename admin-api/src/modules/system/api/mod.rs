@@ -1,63 +1,34 @@
-use axum::{
-    extract::{Path, Query, State},
-    routing::{get, put},
-    Json, Router,
-};
-use serde_json::Value;
+mod sys_auth_api;
+mod sys_config_api;
+mod sys_dept_api;
+mod sys_dict_api;
+mod sys_log_api;
+mod sys_menu_api;
+mod sys_notice_api;
+mod sys_post_api;
+mod sys_role_api;
+mod sys_user_api;
 
-use crate::{
-    app::state::AppState,
-    core::{
-        dto::system::SystemListQueryDto,
-        errors::AppError,
-        response::ApiResponse,
-        vo::system::{SystemCrudDeleteVo, SystemCrudListVo, SystemCrudRecordVo},
-    },
-};
+use axum::Router;
+
+use crate::app::state::AppState;
+
+pub fn public_router() -> Router<AppState> {
+    Router::new().merge(sys_auth_api::SysAuthRouter::system_routes())
+}
+
+pub fn log_router() -> Router<AppState> {
+    Router::new().merge(sys_log_api::SysLogRouter::routes())
+}
 
 pub fn router() -> Router<AppState> {
     Router::new()
-        .route("/{resource}", get(list).post(create))
-        .route("/{resource}/{id}", put(update).delete(remove))
-}
-
-async fn list(
-    State(state): State<AppState>,
-    Path(resource): Path<String>,
-    Query(query): Query<SystemListQueryDto>,
-) -> Result<Json<ApiResponse<SystemCrudListVo>>, AppError> {
-    let data = state
-        .system_service
-        .list(&resource, query.keyword.as_deref())
-        .await?;
-    Ok(Json(ApiResponse::success(data)))
-}
-
-async fn create(
-    State(state): State<AppState>,
-    Path(resource): Path<String>,
-    Json(payload): Json<Value>,
-) -> Result<Json<ApiResponse<SystemCrudRecordVo>>, AppError> {
-    let item = state.system_service.create(&resource, payload).await?;
-    Ok(Json(ApiResponse::success(SystemCrudRecordVo { item })))
-}
-
-async fn update(
-    State(state): State<AppState>,
-    Path((resource, id)): Path<(String, u64)>,
-    Json(payload): Json<Value>,
-) -> Result<Json<ApiResponse<SystemCrudRecordVo>>, AppError> {
-    let item = state.system_service.update(&resource, id, payload).await?;
-    Ok(Json(ApiResponse::success(SystemCrudRecordVo { item })))
-}
-
-async fn remove(
-    State(state): State<AppState>,
-    Path((resource, id)): Path<(String, u64)>,
-) -> Result<Json<ApiResponse<SystemCrudDeleteVo>>, AppError> {
-    let deleted = state.system_service.delete(&resource, id).await?;
-    Ok(Json(ApiResponse::success(SystemCrudDeleteVo {
-        id,
-        deleted,
-    })))
+        .merge(sys_user_api::SysUserRouter::routes())
+        .merge(sys_role_api::SysRoleRouter::routes())
+        .merge(sys_menu_api::SysMenuRouter::routes())
+        .merge(sys_dept_api::SysDeptRouter::routes())
+        .merge(sys_post_api::SysPostRouter::routes())
+        .merge(sys_dict_api::SysDictRouter::routes())
+        .merge(sys_config_api::SysConfigRouter::routes())
+        .merge(sys_notice_api::SysNoticeRouter::routes())
 }

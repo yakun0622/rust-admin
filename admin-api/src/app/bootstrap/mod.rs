@@ -1,4 +1,3 @@
-use anyhow::Context;
 use tokio::net::TcpListener;
 use tracing::info;
 
@@ -7,7 +6,7 @@ use crate::{
     core::{config::AppConfig, logging},
 };
 
-pub async fn run() -> anyhow::Result<()> {
+pub async fn run() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let cfg = AppConfig::load()?;
     logging::init(&cfg.app.log_level)?;
     let state = AppState::new(cfg.clone()).await?;
@@ -15,7 +14,9 @@ pub async fn run() -> anyhow::Result<()> {
     let addr = format!("{}:{}", cfg.server.host, cfg.server.port);
     let listener = TcpListener::bind(&addr)
         .await
-        .with_context(|| format!("failed to bind address: {addr}"))?;
+        .map_err(|e| -> Box<dyn std::error::Error + Send + Sync> {
+            format!("failed to bind address {addr}: {e}").into()
+        })?;
 
     let app = routes::build_router(state);
     info!(
@@ -30,5 +31,5 @@ pub async fn run() -> anyhow::Result<()> {
 
     axum::serve(listener, app)
         .await
-        .context("admin-api exited with server error")
+        .map_err(|e| format!("admin-api exited with server error: {e}").into())
 }

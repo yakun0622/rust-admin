@@ -1,6 +1,7 @@
-use anyhow::Context;
 use config::{Config, File};
 use serde::Deserialize;
+
+type BoxError = Box<dyn std::error::Error + Send + Sync>;
 
 #[derive(Debug, Clone)]
 pub struct AppConfig {
@@ -48,7 +49,6 @@ pub struct DatabaseConfig {
 #[serde(rename_all = "lowercase")]
 pub enum DatabaseDriver {
     MySql,
-    Postgres,
 }
 
 impl Default for DatabaseDriver {
@@ -61,14 +61,12 @@ impl DatabaseDriver {
     pub fn as_str(self) -> &'static str {
         match self {
             Self::MySql => "mysql",
-            Self::Postgres => "postgres",
         }
     }
 
     pub fn display_name(self) -> &'static str {
         match self {
             Self::MySql => "MySQL",
-            Self::Postgres => "PostgreSQL",
         }
     }
 }
@@ -107,7 +105,7 @@ pub struct SecurityConfig {
 }
 
 impl AppConfig {
-    pub fn load() -> anyhow::Result<Self> {
+    pub fn load() -> Result<Self, BoxError> {
         let _ = dotenvy::dotenv();
         let env = std::env::var("APP_ENV").unwrap_or_else(|_| "dev".to_string());
 
@@ -115,19 +113,17 @@ impl AppConfig {
             .add_source(File::with_name("config/default").required(false))
             .add_source(File::with_name(&format!("config/{env}")).required(false))
             .build()
-            .context("failed to build app config")?;
+            .map_err(|e| -> BoxError { format!("failed to build app config: {e}").into() })?;
 
         let raw = settings
             .try_deserialize::<AppConfigRaw>()
-            .context("failed to deserialize app config")?;
+            .map_err(|e| -> BoxError { format!("failed to deserialize app config: {e}").into() })?;
 
         let database = match (raw.database, raw.mysql) {
             (Some(database), _) => database,
             (None, Some(mysql)) => mysql.into(),
             (None, None) => {
-                return Err(anyhow::anyhow!(
-                    "missing [database] config (or legacy [mysql] config)"
-                ))
+                return Err("missing [database] config (or legacy [mysql] config)".into())
             }
         };
 

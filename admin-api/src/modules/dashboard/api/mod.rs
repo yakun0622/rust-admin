@@ -1,13 +1,9 @@
-use axum::{extract::State, routing::get, Json, Router};
+mod overview_api;
 
-use crate::{app::state::AppState, core::response::ApiResponse};
+use axum::Router;
+
+use crate::app::state::AppState;
 
 pub fn router() -> Router<AppState> {
-    Router::new().route("/overview", get(overview))
-}
-
-async fn overview(
-    State(state): State<AppState>,
-) -> Json<ApiResponse<crate::core::vo::dashboard::DashboardOverviewVo>> {
-    Json(ApiResponse::success(state.dashboard_service.overview()))
+    Router::new().merge(overview_api::routes())
 }

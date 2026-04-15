@@ -21,7 +21,7 @@ admin-api/
 │  │  ├─ dto/vo/model/converter/   # 共享对象与转换
 │  │  └─ ...                       # logging/utils/pagination
 │  ├─ middleware/                  # 中间件占位
-│  └─ modules/                     # 业务模块（auth/dashboard/system/log/monitor/ai）
+│  └─ modules/                     # 业务模块（dashboard/system/monitor/ai）
 └─ tests/                          # 测试目录
 ```
 
@@ -31,9 +31,8 @@ admin-api/
 
 1. `config/default.toml`：默认配置。
 2. `config/dev.toml`：开发环境覆盖（MySQL）。
-3. `config/pg.toml`：开发环境覆盖（PostgreSQL）。
-4. `config/prod.toml`：生产环境覆盖。
-5. `.env` 仅保留 `APP_ENV` 用于选择环境。
+3. `config/prod.toml`：生产环境覆盖。
+4. `.env` 仅保留 `APP_ENV` 用于选择环境。
 
 配置加载顺序：
 
@@ -58,19 +57,8 @@ jwt_expires_secs = 7200
 
 ```toml
 [database]
-driver = "mysql" # mysql | postgres
+driver = "mysql"
 url = "mysql://root:123456@127.0.0.1:3306/rust_admin?charset=utf8mb4"
-max_connections = 20
-min_connections = 5
-acquire_timeout_secs = 5
-```
-
-PostgreSQL 示例：
-
-```toml
-[database]
-driver = "postgres"
-url = "postgres://postgres:123456@127.0.0.1:5432/rust_admin"
 max_connections = 20
 min_connections = 5
 acquire_timeout_secs = 5
@@ -87,18 +75,12 @@ mysql -uroot -p < ../sql/mysql_v1_schema.sql
 mysql -uroot -p < ../sql/mysql_v1_seed.sql
 ```
 说明：`mysql_v1_seed.sql` 已更新默认管理员 `admin` 的 bcrypt 密码哈希（明文密码 `admin123456`）。
-3. 初始化数据库（PostgreSQL）：
-```bash
-createdb rust_admin
-psql -d rust_admin -f ../sql/postgres_v1_schema.sql
-psql -d rust_admin -f ../sql/postgres_v1_seed.sql
-```
-4. 选择环境并启动（MySQL 用 `APP_ENV=dev`，PostgreSQL 可用 `APP_ENV=pg`）：
+3. 选择环境并启动：
 ```bash
 cd admin-api
 APP_ENV=dev cargo run
 ```
-5. 验证服务：
+4. 验证服务：
 ```bash
 curl http://127.0.0.1:8080/health
 ```
@@ -116,11 +98,14 @@ cargo run
 ## 当前已实现接口
 
 1. `GET /health`：服务与依赖健康检查。
-2. `POST /api/auth/login`：登录（MySQL/PostgreSQL 用户仓储 + bcrypt 密码校验 + JWT 签发）。
+2. `POST /api/system/auth/login`：登录（`system/sys_auth`，MySQL）。
 3. `GET /api/dashboard/overview`：看板数据（mock）。
-4. `GET/POST/PUT/DELETE /api/system/:resource`：系统管理 8 类资源 CRUD（已接 MySQL/PostgreSQL 持久化，user/role/menu/dept/post/dict/config/notice）。
-5. `GET /api/log/oper`：操作日志查询（MySQL/PostgreSQL，关键字检索）。
-6. `GET /api/log/login`：登录日志查询（MySQL/PostgreSQL，关键字检索）。
+4. 系统管理 8 类资源 CRUD（`user/role/menu/dept/post/dict/config/notice`）：
+   - `GET/POST /api/system/{resource}`
+   - `PUT/DELETE /api/system/{resource}/{id}`
+   - 当前按 `api -> service -> repository` 独立资源链路实现，`system` 模块仅启用 MySQL。
+5. `GET /api/log/oper`：操作日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
+6. `GET /api/log/login`：登录日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
 7. `GET /api/monitor/online`：在线用户查询。
 8. `GET/POST/PUT/DELETE /api/monitor/job`：定时任务管理。
 9. `POST /api/monitor/job/:id/run|pause|resume`：任务执行与状态控制（内置调度器）。
@@ -133,25 +118,23 @@ cargo run
 
 鉴权说明：
 
-1. 除 `POST /api/auth/login` 与 `GET /health` 外，`/api/**` 默认要求 `Authorization: Bearer <token>`。
+1. 除 `POST /api/system/auth/login` 与 `GET /health` 外，`/api/**` 默认要求 `Authorization: Bearer <token>`。
 2. Token 无效或过期会返回 `401`。
 
 认证审计说明：
 
 1. 登录成功与失败会写入 `sys_login_log`（含用户名、类型、状态、IP、消息）。
 
-## PostgreSQL 阶段说明
+## SysUser 模式推广进度
 
-当前已完成阶段 A+B+C 的代码落地：包含 PostgreSQL repository、schema/seed 脚本与工厂装配。  
-下一步是阶段 D 联调与回归（双库实测、回归清单、发布说明）。
+已完成 `A→E` 阶段推广，核心变化如下：
 
-## 阶段 D 工具
+1. `system` 资源统一为 `sys_*` 独立路由与服务实现，不再通过 `resource + Value` 动态透传。
+2. `AppState` 已注入 `sys_user/sys_role/sys_menu/sys_dept/sys_post/sys_dict/sys_config/sys_notice` 服务实例。
+3. 回归脚本 `scripts/regression/smoke_api.sh` 已覆盖 `system` 8 类资源的 `list/create/update/delete`。
 
-1. 双库回归清单：`../docs/postgresql-regression-checklist.md`
-2. Smoke 脚本：
+运行 smoke（请先启动服务）：
+
 ```bash
 bash scripts/regression/smoke_api.sh
 ```
-3. 发布说明草稿：`../docs/postgresql-compatibility-release-notes.md`
-4. 实测结果模板：`../docs/postgresql-validation-report-template.md`
-5. 问题追踪表：`../docs/postgresql-issue-tracker.md`

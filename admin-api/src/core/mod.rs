@@ -1,12 +1,13 @@
 pub mod config;
 pub mod converter;
 pub mod db;
+pub mod dbal;
 pub mod dto;
 pub mod enums;
 pub mod errors;
 pub mod logging;
+pub mod macros;
 pub mod model;
-pub mod pagination;
 pub mod response;
 pub mod utils;
 pub mod vo;

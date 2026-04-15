@@ -15,7 +15,7 @@ export type LoginVo = {
 };
 
 export async function login(payload: LoginReq): Promise<LoginVo> {
-  const res = await http.post<ApiResponse<LoginVo>>("/auth/login", payload);
+  const res = await http.post<ApiResponse<LoginVo>>("/system/auth/login", payload);
   if (res.data.code !== 200 || !res.data.data) {
     throw new Error(res.data.message || "登录失败");
   }

@@ -80,7 +80,7 @@ npm run preview
 admin / admin123456
 ```
 3. 登录后会访问：
-   1. `POST /api/auth/login`
+   1. `POST /api/system/auth/login`
    2. `GET /api/dashboard/overview`
 4. 前端已启用 `401` 自动处理：Token 失效会清理本地令牌并跳转登录页。
 
