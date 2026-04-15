@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 async-trait = "0.1"
 axum = "0.8"
-bcrypt = "0.15"
+bcrypt = "0.19"
 config = "0.15"
 dotenvy = "0.15"
 jsonwebtoken = "9.3"
