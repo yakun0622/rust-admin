@@ -330,6 +330,7 @@ CREATE TABLE IF NOT EXISTS `sys_job_log` (
   `status` TINYINT NOT NULL DEFAULT 1 COMMENT '状态：0失败 1成功',
   `message` VARCHAR(500) NULL COMMENT '日志消息',
   `exception_info` TEXT NULL COMMENT '异常信息',
+  `trigger_type` VARCHAR(16) NOT NULL DEFAULT 'auto' COMMENT '触发方式：auto自动 manual手动',
   `started_at` DATETIME(3) NOT NULL COMMENT '开始时间',
   `finished_at` DATETIME(3) NULL COMMENT '结束时间',
   `duration_ms` INT UNSIGNED NOT NULL DEFAULT 0 COMMENT '执行耗时',

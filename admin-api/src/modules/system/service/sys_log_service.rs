@@ -1,15 +1,19 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     errors::AppError,
     vo::log_vo::{LoginLogItemVo, LoginLogListVo, OperLogItemVo, OperLogListVo},
 };
-use crate::modules::system::repository::interface::ISysLogRepository;
+use crate::modules::system::repository::ISysLogRepository;
 
-use super::interface::ISysLogService;
+#[async_trait]
+pub trait ISysLogService: Interface {
+    async fn list_oper(&self, keyword: Option<&str>) -> Result<OperLogListVo, AppError>;
+    async fn list_login(&self, keyword: Option<&str>) -> Result<LoginLogListVo, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysLogService)]

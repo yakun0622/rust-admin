@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use serde_json::{json, Value};
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     dto::system_dto::{SysNoticeCreateReqDto, SysNoticeUpdateReqDto},
@@ -10,9 +10,15 @@ use crate::core::{
     model::system::SysNoticePo,
     vo::system_vo::SystemCrudListVo,
 };
-use crate::modules::system::repository::interface::ISysNoticeRepository;
+use crate::modules::system::repository::ISysNoticeRepository;
 
-use super::interface::ISysNoticeService;
+#[async_trait]
+pub trait ISysNoticeService: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError>;
+    async fn create(&self, dto: SysNoticeCreateReqDto) -> Result<Value, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysNoticeUpdateReqDto) -> Result<Value, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysNoticeService)]

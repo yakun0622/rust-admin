@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     converter::sys_config_converter::{from_create_dto, from_update_dto, to_sys_config_vo},
@@ -9,9 +9,19 @@ use crate::core::{
     errors::AppError,
     vo::sys_config_vo::{SysConfigListVo, SysConfigVo},
 };
-use crate::modules::system::repository::interface::ISysConfigRepository;
+use crate::modules::system::repository::ISysConfigRepository;
 
-use super::interface::ISysConfigService;
+#[async_trait]
+pub trait ISysConfigService: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysConfigListVo, AppError>;
+    async fn create(&self, dto: SysConfigCreateReqDto) -> Result<SysConfigVo, AppError>;
+    async fn update_by_id(
+        &self,
+        id: u64,
+        dto: SysConfigUpdateReqDto,
+    ) -> Result<SysConfigVo, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysConfigService)]

@@ -175,6 +175,7 @@ CREATE TABLE `sys_job_log` (
   `status` tinyint(4) NOT NULL DEFAULT '1' COMMENT '状态：0失败 1成功',
   `message` varchar(500) DEFAULT NULL COMMENT '日志消息',
   `exception_info` text COMMENT '异常信息',
+  `trigger_type` varchar(16) NOT NULL DEFAULT 'auto' COMMENT '触发方式：auto自动 manual手动',
   `started_at` datetime(3) NOT NULL COMMENT '开始时间',
   `finished_at` datetime(3) DEFAULT NULL COMMENT '结束时间',
   `duration_ms` int(10) unsigned NOT NULL DEFAULT '0' COMMENT '执行耗时',

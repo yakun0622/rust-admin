@@ -22,7 +22,7 @@ async fn list_online(
 ) -> Json<ApiResponse<OnlineUserListVo>> {
     Json(ApiResponse::success(
         state
-            .monitor_service
+            .monitor_online_service
             .list_online_users(query.keyword.as_deref())
             .await,
     ))

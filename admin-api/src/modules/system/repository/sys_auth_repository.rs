@@ -1,10 +1,22 @@
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 use sqlx::{query_as, MySqlPool};
 
 use crate::core::{errors::AppError, model::auth::UserCredentialPo};
 
-use super::interface::ISysAuthRepository;
+#[async_trait]
+pub trait ISysAuthRepository: Interface {
+    async fn find_by_username(&self, username: &str) -> Result<Option<UserCredentialPo>, AppError>;
+
+    async fn append_login_log(
+        &self,
+        username: Option<&str>,
+        login_type: i8,
+        status: i8,
+        message: &str,
+        ip: &str,
+    ) -> Result<(), AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysAuthRepository)]

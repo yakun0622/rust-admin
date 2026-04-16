@@ -26,7 +26,7 @@ async fn cache_search(
 ) -> Result<Json<ApiResponse<CacheSearchVo>>, AppError> {
     let limit = query.limit.unwrap_or(50);
     let data = state
-        .monitor_service
+        .monitor_cache_service
         .search_cache(query.keyword.as_deref(), limit)
         .await?;
     Ok(Json(ApiResponse::success(data)))
@@ -35,6 +35,6 @@ async fn cache_search(
 async fn cache_list(
     State(state): State<AppState>,
 ) -> Result<Json<ApiResponse<CacheNamespaceListVo>>, AppError> {
-    let data = state.monitor_service.cache_namespace_list().await?;
+    let data = state.monitor_cache_service.cache_namespace_list().await?;
     Ok(Json(ApiResponse::success(data)))
 }

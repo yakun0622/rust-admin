@@ -7,7 +7,9 @@ edition = "2021"
 async-trait = "0.1"
 axum = "0.8"
 bcrypt = "0.15"
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 config = "0.15"
+cron = "0.12"
 dotenvy = "0.15"
 jsonwebtoken = "9.3"
 redis = { version = "0.27", features = ["tokio-comp"] }
@@ -16,5 +18,7 @@ serde_json = "1.0"
 shaku = "0.6"
 sqlx = { version = "0.8", default-features = false, features = ["runtime-tokio-rustls", "mysql", "macros"] }
 tokio = { version = "1.41", features = ["macros", "rt-multi-thread", "net", "time", "sync"] }
+tokio-cron-scheduler = "0.13"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
+uuid = "1"

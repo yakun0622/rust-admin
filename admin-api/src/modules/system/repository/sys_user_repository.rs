@@ -1,11 +1,18 @@
 use crate::core::dbal::query::fragments;
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 use sqlx::MySqlPool;
 
 use crate::core::{errors::AppError, model::sys_user::SysUserModel};
 
-use super::interface::ISysUserRepository;
+#[async_trait]
+pub trait ISysUserRepository: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserModel>, AppError>;
+    async fn get_by_id(&self, id: u64) -> Result<Option<SysUserModel>, AppError>;
+    async fn insert(&self, model: &SysUserModel) -> Result<u64, AppError>;
+    async fn update_by_id(&self, id: u64, model: &SysUserModel) -> Result<bool, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysUserRepository)]

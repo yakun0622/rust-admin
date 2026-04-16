@@ -136,4 +136,13 @@ INSERT IGNORE INTO `sys_notice`
 VALUES
   (100, '系统初始化完成', 2, '后台管理系统基础数据初始化公告', '系统基础数据已初始化，可使用 admin 账号进入后台进行后续配置。', 1, 1, CURRENT_TIMESTAMP(3), 1, '初始化公告', 1);
 
+-- =========================
+-- 6) 定时任务初始化（测试任务）
+-- =========================
+
+INSERT IGNORE INTO `sys_job`
+(`id`, `job_name`, `job_group`, `invoke_target`, `cron_expression`, `misfire_policy`, `concurrent`, `status`, `remark`, `last_run_at`, `next_run_at`, `created_by`, `updated_by`, `is_deleted`)
+VALUES
+  (100, '测试任务-缓存统计同步', 'monitor', 'monitor.cache.sync', '0 */2 * * * *', 1, 0, 1, '用于验证调度器与任务日志链路', NULL, NULL, 1, 1, 0);
+
 COMMIT;

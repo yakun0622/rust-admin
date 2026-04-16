@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 use sqlx::{MySqlPool, Row};
 
 use crate::core::{
@@ -8,7 +8,11 @@ use crate::core::{
     model::log::{LoginLogPo, OperLogPo},
 };
 
-use super::interface::ISysLogRepository;
+#[async_trait]
+pub trait ISysLogRepository: Interface {
+    async fn list_oper(&self, keyword: Option<&str>) -> Result<Vec<OperLogPo>, AppError>;
+    async fn list_login(&self, keyword: Option<&str>) -> Result<Vec<LoginLogPo>, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysLogRepository)]

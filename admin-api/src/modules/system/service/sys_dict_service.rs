@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     converter::sys_dict_converter::{from_create_dto, from_update_dto, to_sys_dict_vo},
@@ -9,9 +9,15 @@ use crate::core::{
     errors::AppError,
     vo::sys_dict_vo::{SysDictListVo, SysDictVo},
 };
-use crate::modules::system::repository::interface::ISysDictRepository;
+use crate::modules::system::repository::ISysDictRepository;
 
-use super::interface::ISysDictService;
+#[async_trait]
+pub trait ISysDictService: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysDictListVo, AppError>;
+    async fn create(&self, dto: SysDictCreateReqDto) -> Result<SysDictVo, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysDictUpdateReqDto) -> Result<SysDictVo, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysDictService)]

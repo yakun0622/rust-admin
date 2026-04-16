@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     converter::sys_user_converter::{from_create_dto, from_update_dto, to_sys_user_vo},
@@ -9,9 +9,15 @@ use crate::core::{
     errors::AppError,
     vo::sys_user_vo::SysUserVo,
 };
-use crate::modules::system::repository::{interface::ISysUserRepository, DEFAULT_PASSWORD_HASH};
+use crate::modules::system::repository::{DEFAULT_PASSWORD_HASH, ISysUserRepository};
 
-use super::interface::ISysUserService;
+#[async_trait]
+pub trait ISysUserService: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError>;
+    async fn create(&self, dto: SysUserCreateReqDto) -> Result<SysUserVo, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysUserUpdateReqDto) -> Result<SysUserVo, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysUserService)]

@@ -16,12 +16,12 @@ pub(super) fn routes() -> Router<AppState> {
 
 async fn datasource(State(state): State<AppState>) -> Json<ApiResponse<DatasourceOverviewVo>> {
     Json(ApiResponse::success(
-        state.monitor_service.datasource_overview().await,
+        state.monitor_overview_service.datasource_overview().await,
     ))
 }
 
 async fn server(State(state): State<AppState>) -> Json<ApiResponse<ServerOverviewVo>> {
     Json(ApiResponse::success(
-        state.monitor_service.server_overview().await,
+        state.monitor_overview_service.server_overview().await,
     ))
 }

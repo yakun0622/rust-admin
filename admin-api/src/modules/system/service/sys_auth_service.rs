@@ -6,25 +6,25 @@ use std::{
 use async_trait::async_trait;
 use bcrypt::verify;
 use jsonwebtoken::{decode, encode, DecodingKey, EncodingKey, Header, Validation};
-use serde::{Deserialize, Serialize};
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::{
     core::{
-        converter::auth_converter::to_login_vo, dto::auth_dto::LoginReqDto, errors::AppError,
-        model::auth::UserCredentialPo, vo::auth_vo::LoginVo,
+        common::JwtClaims, converter::auth_converter::to_login_vo, dto::auth_dto::LoginReqDto,
+        errors::AppError, model::auth::UserCredentialPo, vo::auth_vo::LoginVo,
     },
-    modules::system::repository::interface::ISysAuthRepository,
+    modules::system::repository::ISysAuthRepository,
 };
 
-use super::interface::ISysAuthService;
+#[async_trait]
+pub trait ISysAuthService: Interface {
+    async fn login(
+        &self,
+        payload: LoginReqDto,
+        client_ip: Option<String>,
+    ) -> Result<LoginVo, AppError>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct JwtClaims {
-    pub sub: u64,
-    pub username: String,
-    pub exp: usize,
-    pub iat: usize,
+    fn verify_token(&self, token: &str) -> Result<JwtClaims, AppError>;
 }
 
 #[derive(Component, Clone)]

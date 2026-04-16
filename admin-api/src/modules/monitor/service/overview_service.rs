@@ -1,8 +1,28 @@
+use std::sync::Arc;
+
+use crate::core::{
+    config::AppConfig, db::DbPool, redis::RedisClient, utils::now_timestamp_millis,
+};
 use crate::core::vo::monitor_vo::{DatasourceOverviewVo, ServerOverviewVo};
 
-use super::MonitorService;
+#[derive(Clone)]
+pub struct MonitorOverviewService {
+    db_pool: DbPool,
+    redis_client: RedisClient,
+    config: Arc<AppConfig>,
+    started_at_millis: i64,
+}
 
-impl MonitorService {
+impl MonitorOverviewService {
+    pub fn new(db_pool: DbPool, redis_client: RedisClient, config: Arc<AppConfig>) -> Self {
+        Self {
+            db_pool,
+            redis_client,
+            config,
+            started_at_millis: now_timestamp_millis(),
+        }
+    }
+
     pub async fn datasource_overview(&self) -> DatasourceOverviewVo {
         let (ping_ok, ping_message) = match self.db_pool.ping().await {
             Ok(_) => (true, "ok".to_string()),
@@ -22,14 +42,7 @@ impl MonitorService {
     pub async fn server_overview(&self) -> ServerOverviewVo {
         let mysql_ok = self.db_pool.ping().await.is_ok();
 
-        let redis_ok = match self.redis_client.get_multiplexed_async_connection().await {
-            Ok(mut conn) => redis::cmd("PING")
-                .query_async::<String>(&mut conn)
-                .await
-                .map(|pong| pong == "PONG")
-                .unwrap_or(false),
-            Err(_) => false,
-        };
+        let redis_ok = self.redis_client.ping().await.is_ok();
 
         let now = crate::core::utils::now_timestamp_millis();
         let uptime_secs = now.saturating_sub(self.started_at_millis) as u64 / 1000;

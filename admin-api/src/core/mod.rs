@@ -1,3 +1,4 @@
+pub mod common;
 pub mod config;
 pub mod converter;
 pub mod db;
@@ -8,6 +9,7 @@ pub mod errors;
 pub mod logging;
 pub mod macros;
 pub mod model;
+pub mod redis;
 pub mod response;
 pub mod utils;
 pub mod vo;

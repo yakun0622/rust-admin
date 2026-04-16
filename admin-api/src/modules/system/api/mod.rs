@@ -2,6 +2,7 @@ mod sys_auth_api;
 mod sys_config_api;
 mod sys_dept_api;
 mod sys_dict_api;
+mod sys_job_api;
 mod sys_log_api;
 mod sys_menu_api;
 mod sys_notice_api;
@@ -21,6 +22,10 @@ pub fn log_router() -> Router<AppState> {
     Router::new().merge(sys_log_api::SysLogRouter::routes())
 }
 
+pub fn job_router() -> Router<AppState> {
+    Router::new().merge(sys_job_api::SysJobRouter::routes())
+}
+
 pub fn router() -> Router<AppState> {
     Router::new()
         .merge(sys_user_api::SysUserRouter::routes())
@@ -30,5 +35,6 @@ pub fn router() -> Router<AppState> {
         .merge(sys_post_api::SysPostRouter::routes())
         .merge(sys_dict_api::SysDictRouter::routes())
         .merge(sys_config_api::SysConfigRouter::routes())
+        .merge(sys_job_api::SysJobRouter::routes())
         .merge(sys_notice_api::SysNoticeRouter::routes())
 }

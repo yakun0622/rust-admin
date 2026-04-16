@@ -7,6 +7,7 @@ use axum::{
 use crate::{
     app::state::AppState,
     core::{
+        common::CurrentUser,
         dto::sys_user_dto::{SysUserCreateReqDto, SysUserListQueryDto, SysUserUpdateReqDto},
         errors::AppError,
         response::ApiResponse,
@@ -26,6 +27,7 @@ impl SysUserRouter {
 
 async fn list(
     State(state): State<AppState>,
+    _current_user: CurrentUser,
     Query(query): Query<SysUserListQueryDto>,
 ) -> Result<Json<ApiResponse<SysUserListVo>>, AppError> {
     let service = state.user_service();
@@ -36,6 +38,7 @@ async fn list(
 
 async fn create(
     State(state): State<AppState>,
+    _current_user: CurrentUser,
     Json(payload): Json<SysUserCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysUserRecordVo>>, AppError> {
     let service = state.user_service();
@@ -45,6 +48,7 @@ async fn create(
 
 async fn update(
     State(state): State<AppState>,
+    _current_user: CurrentUser,
     Path(id): Path<u64>,
     Json(payload): Json<SysUserUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysUserRecordVo>>, AppError> {
@@ -55,6 +59,7 @@ async fn update(
 
 async fn remove(
     State(state): State<AppState>,
+    _current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysUserDeleteVo>>, AppError> {
     let service = state.user_service();

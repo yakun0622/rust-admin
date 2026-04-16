@@ -1,8 +1,18 @@
+use std::sync::Arc;
+
 use crate::core::vo::monitor_vo::{OnlineUserItemVo, OnlineUserListVo};
+use crate::modules::monitor::repository::MonitorOnlineRepository;
 
-use super::MonitorService;
+#[derive(Clone)]
+pub struct MonitorOnlineService {
+    repo: Arc<MonitorOnlineRepository>,
+}
 
-impl MonitorService {
+impl MonitorOnlineService {
+    pub fn new(repo: Arc<MonitorOnlineRepository>) -> Self {
+        Self { repo }
+    }
+
     pub async fn list_online_users(&self, keyword: Option<&str>) -> OnlineUserListVo {
         let items = self
             .repo

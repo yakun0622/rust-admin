@@ -19,8 +19,26 @@ pub struct JobPo {
     pub job_group: String,
     pub invoke_target: String,
     pub cron_expression: String,
+    pub concurrent: bool,
     pub status: String,
     pub remark: String,
     pub last_run_at: Option<i64>,
     pub next_run_at: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JobLogPo {
+    pub id: u64,
+    pub job_id: u64,
+    pub job_name: String,
+    pub job_group: String,
+    pub invoke_target: String,
+    pub cron_expression: String,
+    pub status: String,
+    pub message: String,
+    pub exception_info: Option<String>,
+    pub trigger_type: String,
+    pub started_at: i64,
+    pub finished_at: Option<i64>,
+    pub duration_ms: u32,
 }

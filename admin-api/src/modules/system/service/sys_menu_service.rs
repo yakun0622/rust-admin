@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
-use shaku::Component;
+use shaku::{Component, Interface};
 
 use crate::core::{
     converter::sys_menu_converter::{from_create_dto, from_update_dto, to_sys_menu_vo},
@@ -9,9 +9,15 @@ use crate::core::{
     errors::AppError,
     vo::sys_menu_vo::{SysMenuListVo, SysMenuVo},
 };
-use crate::modules::system::repository::interface::ISysMenuRepository;
+use crate::modules::system::repository::ISysMenuRepository;
 
-use super::interface::ISysMenuService;
+#[async_trait]
+pub trait ISysMenuService: Interface {
+    async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError>;
+    async fn create(&self, dto: SysMenuCreateReqDto) -> Result<SysMenuVo, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysMenuUpdateReqDto) -> Result<SysMenuVo, AppError>;
+    async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
+}
 
 #[derive(Component, Clone)]
 #[shaku(interface = ISysMenuService)]
