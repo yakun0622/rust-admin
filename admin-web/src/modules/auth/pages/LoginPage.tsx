@@ -8,7 +8,7 @@ import {
 import { Button, Checkbox, Form, Input, message } from "antd";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { setAccessToken } from "../../../core/auth/token";
+import { useAuthSession } from "../../../app/providers";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import { login, type LoginReq } from "../services/authService";
 import "./LoginPage.css";
@@ -19,6 +19,7 @@ type LoginFormValues = LoginReq & {
 
 export function LoginPage() {
   const navigate = useNavigate();
+  const { applyLoginToken } = useAuthSession();
   const [submitting, setSubmitting] = useState(false);
   useDocumentTitle("登录 - Rust Admin");
 
@@ -31,7 +32,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const result = await login(payload);
-      setAccessToken(result.access_token);
+      await applyLoginToken(result.access_token);
       message.success(`欢迎，${result.nickname}`);
       navigate("/dashboard");
     } catch (error) {

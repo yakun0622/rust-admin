@@ -5,7 +5,13 @@ use axum::{
     response::Response,
 };
 
-use crate::{app::state::AppState, core::{common::JwtClaims, errors::AppError}};
+use crate::{
+    app::state::AppState,
+    core::{
+        common::{CurrentUser, JwtClaims},
+        errors::AppError,
+    },
+};
 
 pub async fn require_auth(
     State(state): State<AppState>,
@@ -26,4 +32,23 @@ pub async fn require_auth(
     request.extensions_mut().insert::<JwtClaims>(claims);
 
     Ok(next.run(request).await)
+}
+
+pub async fn ensure_permission(
+    state: &AppState,
+    current_user: &CurrentUser,
+    required_permission: &str,
+) -> Result<(), AppError> {
+    let has_permission = state
+        .auth_service()
+        .has_permission(current_user.user_id(), required_permission)
+        .await?;
+
+    if has_permission {
+        return Ok(());
+    }
+
+    Err(AppError::forbidden(format!(
+        "无权限访问，需要权限: {required_permission}"
+    )))
 }

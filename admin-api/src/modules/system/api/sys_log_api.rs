@@ -7,11 +7,13 @@ use axum::{
 use crate::{
     app::state::AppState,
     core::{
+        common::CurrentUser,
         dto::log_dto::LogListQueryDto,
         errors::AppError,
         response::ApiResponse,
         vo::log_vo::{LoginLogListVo, OperLogListVo},
     },
+    middleware::auth::ensure_permission,
 };
 
 pub struct SysLogRouter;
@@ -26,8 +28,10 @@ impl SysLogRouter {
 
 async fn oper_logs(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Query(query): Query<LogListQueryDto>,
 ) -> Result<Json<ApiResponse<OperLogListVo>>, AppError> {
+    ensure_permission(&state, &current_user, "log:oper:view").await?;
     Ok(Json(ApiResponse::success(
         state
             .log_service()
@@ -38,8 +42,10 @@ async fn oper_logs(
 
 async fn login_logs(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Query(query): Query<LogListQueryDto>,
 ) -> Result<Json<ApiResponse<LoginLogListVo>>, AppError> {
+    ensure_permission(&state, &current_user, "log:login:view").await?;
     Ok(Json(ApiResponse::success(
         state
             .log_service()

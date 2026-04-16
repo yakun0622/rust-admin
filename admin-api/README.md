@@ -99,22 +99,23 @@ cargo run
 
 1. `GET /health`：服务与依赖健康检查。
 2. `POST /api/system/auth/login`：登录（`system/sys_auth`，MySQL）。
-3. `GET /api/dashboard/overview`：看板数据（mock）。
-4. 系统管理 8 类资源 CRUD（`user/role/menu/dept/post/dict/config/notice`）：
+3. `GET /api/system/auth/profile`：当前登录用户信息（含 `permissions` 与动态菜单树 `menus`）。
+4. `GET /api/dashboard/overview`：看板数据（mock）。
+5. 系统管理 8 类资源 CRUD（`user/role/menu/dept/post/dict/config/notice`）：
    - `GET/POST /api/system/{resource}`
    - `PUT/DELETE /api/system/{resource}/{id}`
    - 当前按 `api -> service -> repository` 独立资源链路实现，`system` 模块仅启用 MySQL。
-5. `GET /api/log/oper`：操作日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
-6. `GET /api/log/login`：登录日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
-7. `GET /api/monitor/online`：在线用户查询。
-8. `GET/POST/PUT/DELETE /api/monitor/job`：定时任务管理。
-9. `POST /api/monitor/job/:id/run|pause|resume`：任务执行与状态控制（内置调度器）。
-10. `GET /api/monitor/datasource`：数据源监控。
-11. `GET /api/monitor/server`：服务监控。
-12. `GET /api/monitor/cache`：缓存搜索（只读）。
-13. `GET /api/monitor/cache-list`：缓存命名空间统计。
-14. `GET/POST /api/ai/sessions`：AI Mock 会话列表/创建。
-15. `GET/POST /api/ai/sessions/:session_id/messages`：AI Mock 消息列表/发送。
+6. `GET /api/log/oper`：操作日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
+7. `GET /api/log/login`：登录日志查询（由 `system/sys_log` 提供，MySQL，关键字检索）。
+8. `GET /api/monitor/online`：在线用户查询。
+9. `GET/POST/PUT/DELETE /api/monitor/job`：定时任务管理。
+10. `POST /api/monitor/job/:id/run|pause|resume`：任务执行与状态控制（内置调度器）。
+11. `GET /api/monitor/datasource`：数据源监控。
+12. `GET /api/monitor/server`：服务监控。
+13. `GET /api/monitor/cache`：缓存搜索（只读）。
+14. `GET /api/monitor/cache-list`：缓存命名空间统计。
+15. `GET/POST /api/ai/sessions`：AI Mock 会话列表/创建。
+16. `GET/POST /api/ai/sessions/:session_id/messages`：AI Mock 消息列表/发送。
 
 鉴权说明：
 
@@ -124,6 +125,30 @@ cargo run
 认证审计说明：
 
 1. 登录成功与失败会写入 `sys_login_log`（含用户名、类型、状态、IP、消息）。
+
+## 权限控制（菜单到按钮）
+
+当前采用 RBAC + 权限码模型：
+
+1. 菜单表 `sys_menu` 以 `menu_type` 区分目录(1)/菜单(2)/按钮(3)。
+2. 权限码字段统一使用 `permission`（兼容读取旧字段 `perms`）。
+3. 权限来源链路：`sys_user_role -> sys_role_menu -> sys_menu`。
+4. 超级管理员角色自动注入通配权限 `*:*:*`。
+
+权限码规范：
+
+1. 格式：`模块:资源:动作`。
+2. 示例：`system:user:view`、`system:user:create`、`monitor:job:run`。
+
+后端拦截：
+
+1. 受控接口统一调用 `ensure_permission(state, current_user, "xxx:yyy:zzz")`。
+2. 无权限返回 `403`，前端按钮显隐仅作为体验层，不能替代后端校验。
+
+前端联动：
+
+1. 登录后调用 `GET /api/system/auth/profile` 获取 `permissions + menus`。
+2. 侧边栏使用 `menus` 动态渲染，按钮按 `requiredPerm` 显隐。
 
 ## SysUser 模式推广进度
 
@@ -138,3 +163,13 @@ cargo run
 ```bash
 bash scripts/regression/smoke_api.sh
 ```
+
+运行权限回归（请先启动服务）：
+
+```bash
+bash scripts/regression/permission_api.sh
+```
+
+权限上线与回滚说明见：
+
+1. [`docs/permission-release-rollback.md`](../docs/permission-release-rollback.md)

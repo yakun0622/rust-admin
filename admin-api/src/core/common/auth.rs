@@ -38,10 +38,7 @@ where
         parts: &mut Parts,
         _state: &S,
     ) -> impl std::future::Future<Output = Result<Self, Self::Rejection>> + Send {
-        let claims = parts
-            .extensions
-            .get::<JwtClaims>()
-            .cloned();
+        let claims = parts.extensions.get::<JwtClaims>().cloned();
 
         async move {
             claims

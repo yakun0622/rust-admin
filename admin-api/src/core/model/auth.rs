@@ -9,3 +9,10 @@ pub struct UserCredentialPo {
     pub password_hash: String,
     pub status: i8,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
+pub struct UserProfilePo {
+    pub id: u64,
+    pub username: String,
+    pub nickname: String,
+}

@@ -8,6 +8,7 @@ Rust + React + Ant Design 的后台管理系统模板，覆盖登录、仪表盘
 - 前端：React + TypeScript + Ant Design + ECharts
 - 模块化设计：`auth / dashboard / system / log / monitor / ai`
 - 多主题支持：`明亮 / 暗黑 / 科技`
+- 菜单到按钮级权限控制（RBAC + `permission` 权限码）
 - 系统管理统一 CRUD（用户、角色、菜单、部门、岗位、字典、参数、通知）
 - 监控模块（在线用户、定时任务、数据源、服务、缓存搜索）
 
@@ -93,6 +94,11 @@ cd admin-web
 npm run typecheck
 npm run build
 ```
+
+权限相关文档：
+
+- 方案与阶段任务：[`docs/button-level-permission-control-plan.md`](./docs/button-level-permission-control-plan.md)
+- 上线与回滚：[`docs/permission-release-rollback.md`](./docs/permission-release-rollback.md)
 
 ## 开源协作
 

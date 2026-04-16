@@ -1,17 +1,30 @@
-use axum::{extract::State, http::HeaderMap, routing::post, Json, Router};
+use axum::{
+    extract::State,
+    http::HeaderMap,
+    routing::{get, post},
+    Json, Router,
+};
 
 use crate::{
     app::state::AppState,
     core::{
-        dto::auth_dto::LoginReqDto, errors::AppError, response::ApiResponse, vo::auth_vo::LoginVo,
+        common::CurrentUser,
+        dto::auth_dto::LoginReqDto,
+        errors::AppError,
+        response::ApiResponse,
+        vo::auth_vo::{AuthProfileVo, LoginVo},
     },
 };
 
 pub struct SysAuthRouter;
 
 impl SysAuthRouter {
-    pub fn system_routes() -> Router<AppState> {
+    pub fn public_routes() -> Router<AppState> {
         Router::new().route("/auth/login", post(login))
+    }
+
+    pub fn protected_routes() -> Router<AppState> {
+        Router::new().route("/auth/profile", get(profile))
     }
 }
 
@@ -43,4 +56,12 @@ fn extract_client_ip(headers: &HeaderMap) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(str::to_string)
+}
+
+async fn profile(
+    State(state): State<AppState>,
+    current_user: CurrentUser,
+) -> Result<Json<ApiResponse<AuthProfileVo>>, AppError> {
+    let data = state.auth_service().profile(current_user.user_id()).await?;
+    Ok(Json(ApiResponse::success(data)))
 }

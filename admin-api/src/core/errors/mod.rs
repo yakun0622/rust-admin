@@ -32,6 +32,10 @@ impl AppError {
         Self::new(StatusCode::UNAUTHORIZED.as_u16(), message)
     }
 
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::new(StatusCode::FORBIDDEN.as_u16(), message)
+    }
+
     pub fn not_found(message: impl Into<String>) -> Self {
         Self::new(StatusCode::NOT_FOUND.as_u16(), message)
     }

@@ -1,7 +1,8 @@
 use std::collections::BTreeMap;
 
 use crate::core::{
-    errors::AppError, redis::RedisClient,
+    errors::AppError,
+    redis::RedisClient,
     vo::monitor_vo::{CacheKeyItemVo, CacheNamespaceItemVo, CacheNamespaceListVo, CacheSearchVo},
 };
 
@@ -22,7 +23,10 @@ impl MonitorCacheService {
     ) -> Result<CacheSearchVo, AppError> {
         let safe_limit = limit.clamp(1, 200);
         let pattern = build_redis_pattern(keyword);
-        let keys = self.redis_client.scan_keys(&pattern, safe_limit, 100).await?;
+        let keys = self
+            .redis_client
+            .scan_keys(&pattern, safe_limit, 100)
+            .await?;
         let mut items = Vec::with_capacity(keys.len());
 
         for key in keys {
@@ -31,11 +35,7 @@ impl MonitorCacheService {
                 .key_type(&key)
                 .await
                 .unwrap_or_else(|_| "unknown".to_string());
-            let ttl_secs = self
-                .redis_client
-                .ttl_secs(&key)
-                .await
-                .unwrap_or(-2);
+            let ttl_secs = self.redis_client.ttl_secs(&key).await.unwrap_or(-2);
             let sample = if data_type == "string" {
                 self.redis_client
                     .get_string_opt(&key)

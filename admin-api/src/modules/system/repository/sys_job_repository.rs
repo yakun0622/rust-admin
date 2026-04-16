@@ -423,7 +423,11 @@ fn from_status_value(status: i8) -> &'static str {
 }
 
 fn bool_to_i8(value: bool) -> i8 {
-    if value { 1 } else { 0 }
+    if value {
+        1
+    } else {
+        0
+    }
 }
 
 fn millis_to_unix_seconds(value: i64) -> i64 {

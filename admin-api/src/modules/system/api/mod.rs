@@ -15,7 +15,7 @@ use axum::Router;
 use crate::app::state::AppState;
 
 pub fn public_router() -> Router<AppState> {
-    Router::new().merge(sys_auth_api::SysAuthRouter::system_routes())
+    Router::new().merge(sys_auth_api::SysAuthRouter::public_routes())
 }
 
 pub fn log_router() -> Router<AppState> {
@@ -28,6 +28,7 @@ pub fn job_router() -> Router<AppState> {
 
 pub fn router() -> Router<AppState> {
     Router::new()
+        .merge(sys_auth_api::SysAuthRouter::protected_routes())
         .merge(sys_user_api::SysUserRouter::routes())
         .merge(sys_role_api::SysRoleRouter::routes())
         .merge(sys_menu_api::SysMenuRouter::routes())

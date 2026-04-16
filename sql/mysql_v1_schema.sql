@@ -78,7 +78,8 @@ CREATE TABLE IF NOT EXISTS `sys_menu` (
   `route_name` VARCHAR(64) NULL COMMENT '路由名称',
   `route_path` VARCHAR(128) NULL COMMENT '路由地址',
   `component_path` VARCHAR(255) NULL COMMENT '组件路径',
-  `perms` VARCHAR(100) NULL COMMENT '权限标识',
+  `perms` VARCHAR(100) NULL COMMENT '权限标识（兼容旧字段）',
+  `permission` VARCHAR(100) NULL COMMENT '权限标识（标准字段）',
   `icon` VARCHAR(100) NULL COMMENT '菜单图标',
   `order_num` INT NOT NULL DEFAULT 0 COMMENT '显示顺序',
   `is_external` TINYINT(1) NOT NULL DEFAULT 0 COMMENT '是否外链',
@@ -94,6 +95,7 @@ CREATE TABLE IF NOT EXISTS `sys_menu` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_sys_menu_route_path` (`route_path`),
   KEY `idx_sys_menu_parent` (`parent_id`),
+  KEY `idx_sys_menu_permission` (`permission`),
   KEY `idx_sys_menu_type_status` (`menu_type`, `status`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='菜单表';
 

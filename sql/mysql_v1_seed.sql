@@ -52,31 +52,72 @@ VALUES
 -- =========================
 
 INSERT IGNORE INTO `sys_menu`
-(`id`, `parent_id`, `menu_type`, `menu_name`, `route_name`, `route_path`, `component_path`, `perms`, `icon`, `order_num`, `is_external`, `is_cache`, `is_visible`, `status`, `remark`, `created_by`)
+(`id`, `parent_id`, `menu_type`, `menu_name`, `route_name`, `route_path`, `component_path`, `perms`, `permission`, `icon`, `order_num`, `is_external`, `is_cache`, `is_visible`, `status`, `remark`, `created_by`)
 VALUES
-  (100, 0, 2, 'AI对话', 'AiChat', '/ai/chat', 'pages/ai/chat/index', 'ai:chat:view', 'robot', 1, 0, 0, 1, 1, 'AI对话菜单', 1),
+  (100, 0, 2, 'AI对话', 'AiChat', '/ai/chat', 'pages/ai/chat/index', 'ai:chat:view', 'ai:chat:view', 'robot', 1, 0, 0, 1, 1, 'AI对话菜单', 1),
 
-  (200, 0, 1, '系统管理', 'System', '/system', NULL, NULL, 'setting', 2, 0, 0, 1, 1, '系统管理目录', 1),
-  (201, 200, 2, '用户管理', 'SystemUser', '/system/user', 'pages/system/user/index', 'system:user:view', 'user', 1, 0, 0, 1, 1, '用户管理菜单', 1),
-  (202, 200, 2, '角色管理', 'SystemRole', '/system/role', 'pages/system/role/index', 'system:role:view', 'team', 2, 0, 0, 1, 1, '角色管理菜单', 1),
-  (203, 200, 2, '菜单管理', 'SystemMenu', '/system/menu', 'pages/system/menu/index', 'system:menu:view', 'menu', 3, 0, 0, 1, 1, '菜单管理菜单', 1),
-  (204, 200, 2, '部门管理', 'SystemDept', '/system/dept', 'pages/system/dept/index', 'system:dept:view', 'apartment', 4, 0, 0, 1, 1, '部门管理菜单', 1),
-  (205, 200, 2, '岗位管理', 'SystemPost', '/system/post', 'pages/system/post/index', 'system:post:view', 'idcard', 5, 0, 0, 1, 1, '岗位管理菜单', 1),
-  (206, 200, 2, '字典管理', 'SystemDict', '/system/dict', 'pages/system/dict/index', 'system:dict:view', 'book', 6, 0, 0, 1, 1, '字典管理菜单', 1),
-  (207, 200, 2, '参数设置', 'SystemConfig', '/system/config', 'pages/system/config/index', 'system:config:view', 'tool', 7, 0, 0, 1, 1, '参数设置菜单', 1),
-  (208, 200, 2, '通知公告', 'SystemNotice', '/system/notice', 'pages/system/notice/index', 'system:notice:view', 'notification', 8, 0, 0, 1, 1, '通知公告菜单', 1),
+  (200, 0, 1, '系统管理', 'System', '/system', NULL, NULL, NULL, NULL, 'setting', 2, 0, 0, 1, 1, '系统管理目录', 1),
+  (201, 200, 2, '用户管理', 'SystemUser', '/system/user', 'pages/system/user/index', 'system:user:view', 'system:user:view', 'user', 1, 0, 0, 1, 1, '用户管理菜单', 1),
+  (211, 201, 3, '用户新增', NULL, NULL, NULL, 'system:user:create', 'system:user:create', NULL, 1, 0, 0, 0, 1, '用户新增按钮', 1),
+  (212, 201, 3, '用户编辑', NULL, NULL, NULL, 'system:user:update', 'system:user:update', NULL, 2, 0, 0, 0, 1, '用户编辑按钮', 1),
+  (213, 201, 3, '用户删除', NULL, NULL, NULL, 'system:user:delete', 'system:user:delete', NULL, 3, 0, 0, 0, 1, '用户删除按钮', 1),
 
-  (300, 0, 1, '日志管理', 'Log', '/log', NULL, NULL, 'file-text', 3, 0, 0, 1, 1, '日志管理目录', 1),
-  (301, 300, 2, '操作日志', 'LogOper', '/log/oper', 'pages/log/oper/index', 'log:oper:view', 'profile', 1, 0, 0, 1, 1, '操作日志菜单', 1),
-  (302, 300, 2, '登录日志', 'LogLogin', '/log/login', 'pages/log/login/index', 'log:login:view', 'login', 2, 0, 0, 1, 1, '登录日志菜单', 1),
+  (202, 200, 2, '角色管理', 'SystemRole', '/system/role', 'pages/system/role/index', 'system:role:view', 'system:role:view', 'team', 2, 0, 0, 1, 1, '角色管理菜单', 1),
+  (221, 202, 3, '角色新增', NULL, NULL, NULL, 'system:role:create', 'system:role:create', NULL, 1, 0, 0, 0, 1, '角色新增按钮', 1),
+  (222, 202, 3, '角色编辑', NULL, NULL, NULL, 'system:role:update', 'system:role:update', NULL, 2, 0, 0, 0, 1, '角色编辑按钮', 1),
+  (223, 202, 3, '角色删除', NULL, NULL, NULL, 'system:role:delete', 'system:role:delete', NULL, 3, 0, 0, 0, 1, '角色删除按钮', 1),
 
-  (400, 0, 1, '系统监控', 'Monitor', '/monitor', NULL, NULL, 'monitor', 4, 0, 0, 1, 1, '系统监控目录', 1),
-  (401, 400, 2, '在线用户', 'MonitorOnline', '/monitor/online', 'pages/monitor/online/index', 'monitor:online:view', 'usergroup-add', 1, 0, 0, 1, 1, '在线用户菜单', 1),
-  (402, 400, 2, '定时任务', 'MonitorJob', '/monitor/job', 'pages/monitor/job/index', 'monitor:job:view', 'schedule', 2, 0, 0, 1, 1, '定时任务菜单', 1),
-  (403, 400, 2, '数据监控', 'MonitorDatasource', '/monitor/datasource', 'pages/monitor/datasource/index', 'monitor:datasource:view', 'database', 3, 0, 0, 1, 1, '数据监控菜单', 1),
-  (404, 400, 2, '服务监控', 'MonitorServer', '/monitor/server', 'pages/monitor/server/index', 'monitor:server:view', 'cloud-server', 4, 0, 0, 1, 1, '服务监控菜单', 1),
-  (405, 400, 2, '缓存监控', 'MonitorCache', '/monitor/cache', 'pages/monitor/cache/index', 'monitor:cache:view', 'hdd', 5, 0, 0, 1, 1, '缓存监控菜单', 1),
-  (406, 400, 2, '缓存列表', 'MonitorCacheList', '/monitor/cache-list', 'pages/monitor/cache-list/index', 'monitor:cache-list:view', 'bars', 6, 0, 0, 1, 1, '缓存列表菜单', 1);
+  (203, 200, 2, '菜单管理', 'SystemMenu', '/system/menu', 'pages/system/menu/index', 'system:menu:view', 'system:menu:view', 'menu', 3, 0, 0, 1, 1, '菜单管理菜单', 1),
+  (231, 203, 3, '菜单新增', NULL, NULL, NULL, 'system:menu:create', 'system:menu:create', NULL, 1, 0, 0, 0, 1, '菜单新增按钮', 1),
+  (232, 203, 3, '菜单编辑', NULL, NULL, NULL, 'system:menu:update', 'system:menu:update', NULL, 2, 0, 0, 0, 1, '菜单编辑按钮', 1),
+  (233, 203, 3, '菜单删除', NULL, NULL, NULL, 'system:menu:delete', 'system:menu:delete', NULL, 3, 0, 0, 0, 1, '菜单删除按钮', 1),
+
+  (204, 200, 2, '部门管理', 'SystemDept', '/system/dept', 'pages/system/dept/index', 'system:dept:view', 'system:dept:view', 'apartment', 4, 0, 0, 1, 1, '部门管理菜单', 1),
+  (241, 204, 3, '部门新增', NULL, NULL, NULL, 'system:dept:create', 'system:dept:create', NULL, 1, 0, 0, 0, 1, '部门新增按钮', 1),
+  (242, 204, 3, '部门编辑', NULL, NULL, NULL, 'system:dept:update', 'system:dept:update', NULL, 2, 0, 0, 0, 1, '部门编辑按钮', 1),
+  (243, 204, 3, '部门删除', NULL, NULL, NULL, 'system:dept:delete', 'system:dept:delete', NULL, 3, 0, 0, 0, 1, '部门删除按钮', 1),
+
+  (205, 200, 2, '岗位管理', 'SystemPost', '/system/post', 'pages/system/post/index', 'system:post:view', 'system:post:view', 'idcard', 5, 0, 0, 1, 1, '岗位管理菜单', 1),
+  (251, 205, 3, '岗位新增', NULL, NULL, NULL, 'system:post:create', 'system:post:create', NULL, 1, 0, 0, 0, 1, '岗位新增按钮', 1),
+  (252, 205, 3, '岗位编辑', NULL, NULL, NULL, 'system:post:update', 'system:post:update', NULL, 2, 0, 0, 0, 1, '岗位编辑按钮', 1),
+  (253, 205, 3, '岗位删除', NULL, NULL, NULL, 'system:post:delete', 'system:post:delete', NULL, 3, 0, 0, 0, 1, '岗位删除按钮', 1),
+
+  (206, 200, 2, '字典管理', 'SystemDict', '/system/dict', 'pages/system/dict/index', 'system:dict:view', 'system:dict:view', 'book', 6, 0, 0, 1, 1, '字典管理菜单', 1),
+  (261, 206, 3, '字典新增', NULL, NULL, NULL, 'system:dict:create', 'system:dict:create', NULL, 1, 0, 0, 0, 1, '字典新增按钮', 1),
+  (262, 206, 3, '字典编辑', NULL, NULL, NULL, 'system:dict:update', 'system:dict:update', NULL, 2, 0, 0, 0, 1, '字典编辑按钮', 1),
+  (263, 206, 3, '字典删除', NULL, NULL, NULL, 'system:dict:delete', 'system:dict:delete', NULL, 3, 0, 0, 0, 1, '字典删除按钮', 1),
+
+  (207, 200, 2, '参数设置', 'SystemConfig', '/system/config', 'pages/system/config/index', 'system:config:view', 'system:config:view', 'tool', 7, 0, 0, 1, 1, '参数设置菜单', 1),
+  (271, 207, 3, '参数新增', NULL, NULL, NULL, 'system:config:create', 'system:config:create', NULL, 1, 0, 0, 0, 1, '参数新增按钮', 1),
+  (272, 207, 3, '参数编辑', NULL, NULL, NULL, 'system:config:update', 'system:config:update', NULL, 2, 0, 0, 0, 1, '参数编辑按钮', 1),
+  (273, 207, 3, '参数删除', NULL, NULL, NULL, 'system:config:delete', 'system:config:delete', NULL, 3, 0, 0, 0, 1, '参数删除按钮', 1),
+
+  (208, 200, 2, '通知公告', 'SystemNotice', '/system/notice', 'pages/system/notice/index', 'system:notice:view', 'system:notice:view', 'notification', 8, 0, 0, 1, 1, '通知公告菜单', 1),
+  (281, 208, 3, '公告新增', NULL, NULL, NULL, 'system:notice:create', 'system:notice:create', NULL, 1, 0, 0, 0, 1, '公告新增按钮', 1),
+  (282, 208, 3, '公告编辑', NULL, NULL, NULL, 'system:notice:update', 'system:notice:update', NULL, 2, 0, 0, 0, 1, '公告编辑按钮', 1),
+  (283, 208, 3, '公告删除', NULL, NULL, NULL, 'system:notice:delete', 'system:notice:delete', NULL, 3, 0, 0, 0, 1, '公告删除按钮', 1),
+
+  (300, 0, 1, '日志管理', 'Log', '/log', NULL, NULL, NULL, NULL, 'file-text', 3, 0, 0, 1, 1, '日志管理目录', 1),
+  (301, 300, 2, '操作日志', 'LogOper', '/log/oper', 'pages/log/oper/index', 'log:oper:view', 'log:oper:view', 'profile', 1, 0, 0, 1, 1, '操作日志菜单', 1),
+  (311, 301, 3, '操作日志清理', NULL, NULL, NULL, 'log:oper:delete', 'log:oper:delete', NULL, 1, 0, 0, 0, 1, '操作日志清理按钮', 1),
+  (302, 300, 2, '登录日志', 'LogLogin', '/log/login', 'pages/log/login/index', 'log:login:view', 'log:login:view', 'login', 2, 0, 0, 1, 1, '登录日志菜单', 1),
+  (312, 302, 3, '登录日志清理', NULL, NULL, NULL, 'log:login:delete', 'log:login:delete', NULL, 1, 0, 0, 0, 1, '登录日志清理按钮', 1),
+
+  (400, 0, 1, '系统监控', 'Monitor', '/monitor', NULL, NULL, NULL, NULL, 'monitor', 4, 0, 0, 1, 1, '系统监控目录', 1),
+  (401, 400, 2, '在线用户', 'MonitorOnline', '/monitor/online', 'pages/monitor/online/index', 'monitor:online:view', 'monitor:online:view', 'usergroup-add', 1, 0, 0, 1, 1, '在线用户菜单', 1),
+  (421, 401, 3, '在线用户强退', NULL, NULL, NULL, 'monitor:online:kickout', 'monitor:online:kickout', NULL, 1, 0, 0, 0, 1, '在线用户强退按钮', 1),
+  (402, 400, 2, '定时任务', 'MonitorJob', '/monitor/job', 'pages/monitor/job/index', 'monitor:job:view', 'monitor:job:view', 'schedule', 2, 0, 0, 1, 1, '定时任务菜单', 1),
+  (422, 402, 3, '任务新增', NULL, NULL, NULL, 'monitor:job:create', 'monitor:job:create', NULL, 1, 0, 0, 0, 1, '任务新增按钮', 1),
+  (423, 402, 3, '任务编辑', NULL, NULL, NULL, 'monitor:job:update', 'monitor:job:update', NULL, 2, 0, 0, 0, 1, '任务编辑按钮', 1),
+  (424, 402, 3, '任务删除', NULL, NULL, NULL, 'monitor:job:delete', 'monitor:job:delete', NULL, 3, 0, 0, 0, 1, '任务删除按钮', 1),
+  (425, 402, 3, '任务执行', NULL, NULL, NULL, 'monitor:job:run', 'monitor:job:run', NULL, 4, 0, 0, 0, 1, '任务立即执行按钮', 1),
+  (426, 402, 3, '任务暂停', NULL, NULL, NULL, 'monitor:job:pause', 'monitor:job:pause', NULL, 5, 0, 0, 0, 1, '任务暂停按钮', 1),
+  (427, 402, 3, '任务恢复', NULL, NULL, NULL, 'monitor:job:resume', 'monitor:job:resume', NULL, 6, 0, 0, 0, 1, '任务恢复按钮', 1),
+  (403, 400, 2, '数据监控', 'MonitorDatasource', '/monitor/datasource', 'pages/monitor/datasource/index', 'monitor:datasource:view', 'monitor:datasource:view', 'database', 3, 0, 0, 1, 1, '数据监控菜单', 1),
+  (404, 400, 2, '服务监控', 'MonitorServer', '/monitor/server', 'pages/monitor/server/index', 'monitor:server:view', 'monitor:server:view', 'cloud-server', 4, 0, 0, 1, 1, '服务监控菜单', 1),
+  (405, 400, 2, '缓存监控', 'MonitorCache', '/monitor/cache', 'pages/monitor/cache/index', 'monitor:cache:view', 'monitor:cache:view', 'hdd', 5, 0, 0, 1, 1, '缓存监控菜单', 1),
+  (451, 405, 3, '缓存搜索', NULL, NULL, NULL, 'monitor:cache:search', 'monitor:cache:search', NULL, 1, 0, 0, 0, 1, '缓存搜索按钮', 1),
+  (406, 400, 2, '缓存列表', 'MonitorCacheList', '/monitor/cache-list', 'pages/monitor/cache-list/index', 'monitor:cache-list:view', 'monitor:cache-list:view', 'bars', 6, 0, 0, 1, 1, '缓存列表菜单', 1);
 
 INSERT IGNORE INTO `sys_role_menu`
 (`id`, `role_id`, `menu_id`, `created_by`)
@@ -100,7 +141,41 @@ VALUES
   (1017, 1, 403, 1),
   (1018, 1, 404, 1),
   (1019, 1, 405, 1),
-  (1020, 1, 406, 1);
+  (1020, 1, 406, 1),
+  (1021, 1, 211, 1),
+  (1022, 1, 212, 1),
+  (1023, 1, 213, 1),
+  (1024, 1, 221, 1),
+  (1025, 1, 222, 1),
+  (1026, 1, 223, 1),
+  (1027, 1, 231, 1),
+  (1028, 1, 232, 1),
+  (1029, 1, 233, 1),
+  (1030, 1, 241, 1),
+  (1031, 1, 242, 1),
+  (1032, 1, 243, 1),
+  (1033, 1, 251, 1),
+  (1034, 1, 252, 1),
+  (1035, 1, 253, 1),
+  (1036, 1, 261, 1),
+  (1037, 1, 262, 1),
+  (1038, 1, 263, 1),
+  (1039, 1, 271, 1),
+  (1040, 1, 272, 1),
+  (1041, 1, 273, 1),
+  (1042, 1, 281, 1),
+  (1043, 1, 282, 1),
+  (1044, 1, 283, 1),
+  (1045, 1, 311, 1),
+  (1046, 1, 312, 1),
+  (1047, 1, 421, 1),
+  (1048, 1, 422, 1),
+  (1049, 1, 423, 1),
+  (1050, 1, 424, 1),
+  (1051, 1, 425, 1),
+  (1052, 1, 426, 1),
+  (1053, 1, 427, 1),
+  (1054, 1, 451, 1);
 
 -- =========================
 -- 4) 字典与参数

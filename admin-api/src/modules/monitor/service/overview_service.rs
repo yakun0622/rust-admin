@@ -1,9 +1,7 @@
 use std::sync::Arc;
 
-use crate::core::{
-    config::AppConfig, db::DbPool, redis::RedisClient, utils::now_timestamp_millis,
-};
 use crate::core::vo::monitor_vo::{DatasourceOverviewVo, ServerOverviewVo};
+use crate::core::{config::AppConfig, db::DbPool, redis::RedisClient, utils::now_timestamp_millis};
 
 #[derive(Clone)]
 pub struct MonitorOverviewService {

@@ -14,6 +14,9 @@ import {
   message
 } from "antd";
 import type { TableProps } from "antd";
+import { useEffect, useState } from "react";
+import { useAuthSession } from "../../../app/providers";
+import { hasPermission } from "../../../core/permission";
 import { PageHeader } from "../../../shared/components/PageHeader";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import {
@@ -28,7 +31,6 @@ import type {
   CrudSelectOption,
   SystemCrudPageConfig
 } from "../configs/crudConfigs";
-import { useEffect, useState } from "react";
 
 type SystemPageProps = {
   config: SystemCrudPageConfig;
@@ -143,6 +145,12 @@ export function SystemPage({ config }: SystemPageProps) {
   const [keyword, setKeyword] = useState("");
   const [editingRecord, setEditingRecord] = useState<SystemCrudRecord | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+  const { permissions: userPerms, loading: authLoading } = useAuthSession();
+  const permissionConfig = config.permissions || {};
+  const canView = hasPermission(userPerms, permissionConfig.view || "");
+  const canCreate = hasPermission(userPerms, permissionConfig.create || "");
+  const canUpdate = hasPermission(userPerms, permissionConfig.update || "");
+  const canDelete = hasPermission(userPerms, permissionConfig.delete || "");
   const treeConfig = config.tree;
   const isTreeMode = treeConfig?.enabled ?? false;
   const treeParentKey = treeConfig?.parentKey || "parent_id";
@@ -180,10 +188,24 @@ export function SystemPage({ config }: SystemPageProps) {
   }
 
   useEffect(() => {
+    if (authLoading) {
+      return;
+    }
+    if (!canView) {
+      setError(null);
+      setRecords([]);
+      setTotal(0);
+      setLoading(false);
+      return;
+    }
     void loadData(keyword);
-  }, [config.resource, keyword]);
+  }, [authLoading, canView, config.resource, keyword]);
 
   function openCreateModal() {
+    if (!canCreate) {
+      messageApi.warning("没有新增权限");
+      return;
+    }
     setEditingRecord(null);
     const defaults = config.fields.reduce<Record<string, string | number>>((acc, field) => {
       if (field.editOnly) {
@@ -200,6 +222,10 @@ export function SystemPage({ config }: SystemPageProps) {
   }
 
   function openEditModal(record: SystemCrudRecord) {
+    if (!canUpdate) {
+      messageApi.warning("没有编辑权限");
+      return;
+    }
     setEditingRecord(record);
     form.setFieldsValue(record as FormValues);
     setModalOpen(true);
@@ -212,6 +238,10 @@ export function SystemPage({ config }: SystemPageProps) {
   }
 
   async function handleDelete(record: SystemCrudRecord) {
+    if (!canDelete) {
+      messageApi.warning("没有删除权限");
+      return;
+    }
     if (!Number.isFinite(record.id)) {
       messageApi.error("删除失败：记录ID无效");
       return;
@@ -227,6 +257,15 @@ export function SystemPage({ config }: SystemPageProps) {
   }
 
   async function handleSubmit() {
+    if (editingRecord && !canUpdate) {
+      messageApi.warning("没有编辑权限");
+      return;
+    }
+    if (!editingRecord && !canCreate) {
+      messageApi.warning("没有新增权限");
+      return;
+    }
+
     try {
       const values = await form.validateFields(activeFields.map((field) => field.key));
       setSaving(true);
@@ -294,23 +333,33 @@ export function SystemPage({ config }: SystemPageProps) {
       key: "actions",
       width: 180,
       fixed: "right",
-      render: (_, record) => (
-        <Space size={12}>
-          <Button
-            type="link"
-            size="small"
-            icon={<EditOutlined />}
-            onClick={() => openEditModal(record)}
-          >
-            编辑
-          </Button>
-          <Popconfirm title="确认删除这条记录吗？" onConfirm={() => handleDelete(record)}>
-            <Button type="link" size="small" danger icon={<DeleteOutlined />}>
-              删除
-            </Button>
-          </Popconfirm>
-        </Space>
-      )
+      render: (_, record) => {
+        if (!canUpdate && !canDelete) {
+          return "-";
+        }
+
+        return (
+          <Space size={12}>
+            {canUpdate ? (
+              <Button
+                type="link"
+                size="small"
+                icon={<EditOutlined />}
+                onClick={() => openEditModal(record)}
+              >
+                编辑
+              </Button>
+            ) : null}
+            {canDelete ? (
+              <Popconfirm title="确认删除这条记录吗？" onConfirm={() => handleDelete(record)}>
+                <Button type="link" size="small" danger icon={<DeleteOutlined />}>
+                  删除
+                </Button>
+              </Popconfirm>
+            ) : null}
+          </Space>
+        );
+      }
     }
   ];
 
@@ -327,7 +376,17 @@ export function SystemPage({ config }: SystemPageProps) {
           style={{ marginBottom: 16 }}
         />
       ) : null}
-      <Card>
+      {!authLoading && !canView ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="无访问权限"
+          description={`当前账号缺少 ${permissionConfig.view || "该页面"} 权限`}
+          style={{ marginBottom: 16 }}
+        />
+      ) : null}
+      {authLoading || canView ? (
+        <Card>
         <Space style={{ width: "100%", justifyContent: "space-between", marginBottom: 16 }}>
           <Space>
             <Input.Search
@@ -345,9 +404,13 @@ export function SystemPage({ config }: SystemPageProps) {
               重置
             </Button>
           </Space>
-          <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-            新增
-          </Button>
+          {canCreate ? (
+            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+              新增
+            </Button>
+          ) : (
+            <span />
+          )}
         </Space>
         <Table<SystemCrudRecord>
           rowKey="id"
@@ -359,6 +422,7 @@ export function SystemPage({ config }: SystemPageProps) {
           defaultExpandAllRows={isTreeMode ? treeConfig?.expandAllByDefault ?? true : false}
         />
       </Card>
+      ) : null}
 
       <Modal
         title={editingRecord ? `编辑${config.title}` : `新增${config.title}`}

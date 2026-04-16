@@ -25,13 +25,26 @@ import {
   ToolOutlined,
   UserOutlined
 } from "@ant-design/icons";
-import { Avatar, Badge, Button, Dropdown, Input, Layout, Menu, Select, Space, Typography, message } from "antd";
+import {
+  Avatar,
+  Badge,
+  Button,
+  Dropdown,
+  Input,
+  Layout,
+  Menu,
+  Select,
+  Space,
+  Typography,
+  message
+} from "antd";
 import type { MenuProps } from "antd";
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
-import { clearAccessToken } from "../../core/auth/token";
-import { APP_THEME_OPTIONS, useAppTheme, type AppThemeMode } from "../providers";
+import { hasPermission } from "../../core/permission";
+import type { AuthMenuVo } from "../../modules/auth/services/authService";
+import { APP_THEME_OPTIONS, useAppTheme, useAuthSession, type AppThemeMode } from "../providers";
 import "./AdminLayout.css";
 
 const { Header, Sider, Content } = Layout;
@@ -40,104 +53,133 @@ type QuickAction = {
   key: string;
   label: string;
   icon: ReactNode;
+  requiredPerm?: string;
 };
 
-const menuItems: MenuProps["items"] = [
-  { key: "/dashboard", icon: <DashboardOutlined />, label: "仪表盘" },
-  { key: "/ai/chat", icon: <MessageOutlined />, label: "AI 对话" },
-  {
-    key: "system",
-    icon: <SettingOutlined />,
-    label: "系统管理",
-    children: [
-      { key: "/system/user", icon: <UserOutlined />, label: "用户管理" },
-      { key: "/system/role", icon: <TeamOutlined />, label: "角色管理" },
-      { key: "/system/menu", icon: <MenuOutlined />, label: "菜单管理" },
-      { key: "/system/dept", icon: <ApartmentOutlined />, label: "部门管理" },
-      { key: "/system/post", icon: <IdcardOutlined />, label: "岗位管理" },
-      { key: "/system/dict", icon: <BookOutlined />, label: "字典管理" },
-      { key: "/system/config", icon: <ToolOutlined />, label: "参数设置" },
-      { key: "/system/notice", icon: <NotificationOutlined />, label: "通知公告" }
-    ]
-  },
-  {
-    key: "log",
-    icon: <FileTextOutlined />,
-    label: "日志管理",
-    children: [
-      { key: "/log/oper", icon: <ProfileOutlined />, label: "操作日志" },
-      { key: "/log/login", icon: <LoginOutlined />, label: "登录日志" }
-    ]
-  },
-  {
-    key: "monitor",
-    icon: <MonitorOutlined />,
-    label: "系统监控",
-    children: [
-      { key: "/monitor/online", icon: <UserOutlined />, label: "在线用户" },
-      { key: "/monitor/job", icon: <FundProjectionScreenOutlined />, label: "定时任务" },
-      { key: "/monitor/datasource", icon: <DatabaseOutlined />, label: "数据监控" },
-      { key: "/monitor/server", icon: <CloudServerOutlined />, label: "服务监控" },
-      { key: "/monitor/cache", icon: <HddOutlined />, label: "缓存监控" },
-      { key: "/monitor/cache-list", icon: <MenuOutlined />, label: "缓存列表" }
-    ]
-  }
-];
-
-const routeTitleMap: Record<string, string> = {
-  "/dashboard": "仪表盘",
-  "/ai/chat": "AI 对话",
-  "/system/user": "用户管理",
-  "/system/role": "角色管理",
-  "/system/menu": "菜单管理",
-  "/system/dept": "部门管理",
-  "/system/post": "岗位管理",
-  "/system/dict": "字典管理",
-  "/system/config": "参数设置",
-  "/system/notice": "通知公告",
-  "/log/oper": "操作日志",
-  "/log/login": "登录日志",
-  "/monitor/online": "在线用户",
-  "/monitor/job": "定时任务",
-  "/monitor/datasource": "数据监控",
-  "/monitor/server": "服务监控",
-  "/monitor/cache": "缓存监控",
-  "/monitor/cache-list": "缓存列表"
+type MenuPathMeta = {
+  path: string;
+  title: string;
+  parentKeys: string[];
 };
 
-const parentKeyByPath: Record<string, string | undefined> = {
-  "/system/user": "system",
-  "/system/role": "system",
-  "/system/menu": "system",
-  "/system/dept": "system",
-  "/system/post": "system",
-  "/system/dict": "system",
-  "/system/config": "system",
-  "/system/notice": "system",
-  "/log/oper": "log",
-  "/log/login": "log",
-  "/monitor/online": "monitor",
-  "/monitor/job": "monitor",
-  "/monitor/datasource": "monitor",
-  "/monitor/server": "monitor",
-  "/monitor/cache": "monitor",
-  "/monitor/cache-list": "monitor"
+const iconMap: Record<string, ReactNode> = {
+  robot: <MessageOutlined />,
+  setting: <SettingOutlined />,
+  user: <UserOutlined />,
+  team: <TeamOutlined />,
+  menu: <MenuOutlined />,
+  apartment: <ApartmentOutlined />,
+  idcard: <IdcardOutlined />,
+  book: <BookOutlined />,
+  tool: <ToolOutlined />,
+  notification: <NotificationOutlined />,
+  "file-text": <FileTextOutlined />,
+  profile: <ProfileOutlined />,
+  login: <LoginOutlined />,
+  monitor: <MonitorOutlined />,
+  "usergroup-add": <UserOutlined />,
+  schedule: <FundProjectionScreenOutlined />,
+  database: <DatabaseOutlined />,
+  "cloud-server": <CloudServerOutlined />,
+  hdd: <HddOutlined />,
+  bars: <MenuOutlined />,
+  dashboard: <DashboardOutlined />
 };
 
 const quickActions: QuickAction[] = [
-  { key: "/system/user", label: "新增用户", icon: <UserOutlined /> },
-  { key: "/system/config", label: "系统配置", icon: <SettingOutlined /> },
-  { key: "/log/oper", label: "查看日志", icon: <FileTextOutlined /> },
-  { key: "/monitor/datasource", label: "数据备份", icon: <DatabaseOutlined /> }
+  { key: "/system/user", label: "新增用户", icon: <UserOutlined />, requiredPerm: "system:user:create" },
+  { key: "/system/config", label: "系统配置", icon: <SettingOutlined />, requiredPerm: "system:config:update" },
+  { key: "/log/oper", label: "查看日志", icon: <FileTextOutlined />, requiredPerm: "log:oper:view" },
+  { key: "/monitor/datasource", label: "数据备份", icon: <DatabaseOutlined />, requiredPerm: "monitor:datasource:view" }
 ];
 
-function resolveCurrentTitle(pathname: string): string {
-  if (routeTitleMap[pathname]) {
-    return routeTitleMap[pathname];
+function normalizePath(path?: string): string {
+  if (!path) {
+    return "";
+  }
+  const trimmed = path.trim();
+  if (!trimmed || !trimmed.startsWith("/")) {
+    return "";
+  }
+  return trimmed === "/" ? "/" : trimmed.replace(/\/+$/, "");
+}
+
+function resolveMenuKey(menu: AuthMenuVo): string {
+  return normalizePath(menu.path) || `menu-${menu.id}`;
+}
+
+function resolveMenuIcon(icon?: string): ReactNode {
+  if (!icon) {
+    return <MenuOutlined />;
+  }
+  return iconMap[icon] || <MenuOutlined />;
+}
+
+function buildAntdMenuItems(nodes: AuthMenuVo[]): NonNullable<MenuProps["items"]> {
+  return [...nodes]
+    .sort((a, b) => (a.order_num - b.order_num) || (a.id - b.id))
+    .map((node) => {
+      const children = buildAntdMenuItems(
+        (node.children || []).filter((child) => child.menu_type !== 3)
+      );
+      const key = resolveMenuKey(node);
+      if (children.length > 0) {
+        return {
+          key,
+          icon: resolveMenuIcon(node.icon),
+          label: node.name,
+          children
+        };
+      }
+
+      return {
+        key,
+        icon: resolveMenuIcon(node.icon),
+        label: node.name
+      };
+    });
+}
+
+function collectMenuPathMeta(
+  nodes: AuthMenuVo[],
+  parentKeys: string[] = []
+): MenuPathMeta[] {
+  const result: MenuPathMeta[] = [];
+  const sortedNodes = [...nodes].sort((a, b) => (a.order_num - b.order_num) || (a.id - b.id));
+
+  sortedNodes.forEach((node) => {
+    const key = resolveMenuKey(node);
+    const nodePath = normalizePath(node.path);
+    const children = (node.children || []).filter((child) => child.menu_type !== 3);
+    if (nodePath && node.menu_type === 2) {
+      result.push({
+        path: nodePath,
+        title: node.name,
+        parentKeys
+      });
+    }
+    if (children.length > 0) {
+      result.push(...collectMenuPathMeta(children, [...parentKeys, key]));
+    }
+  });
+
+  return result;
+}
+
+function resolveMatchedPathMeta(pathname: string, pathMetaList: MenuPathMeta[]): MenuPathMeta | null {
+  const normalizedPathname = normalizePath(pathname);
+  if (!normalizedPathname) {
+    return null;
   }
 
-  const matchedRoute = Object.keys(routeTitleMap).find((route) => pathname.startsWith(route));
-  return matchedRoute ? routeTitleMap[matchedRoute] : "后台管理系统";
+  const matched = pathMetaList
+    .filter(
+      (item) =>
+        normalizedPathname === item.path || normalizedPathname.startsWith(`${item.path}/`)
+    )
+    .sort((a, b) => b.path.length - a.path.length);
+
+  return matched[0] || null;
 }
 
 export function AdminLayout() {
@@ -145,18 +187,41 @@ export function AdminLayout() {
   const location = useLocation();
   const [messageApi, contextHolder] = message.useMessage();
   const { themeMode, setThemeMode } = useAppTheme();
+  const { profile, menus, permissions, loading: authLoading, error: authError, logout, hasPerm } = useAuthSession();
   const [openKeys, setOpenKeys] = useState<string[]>([]);
-  const currentParentKey = parentKeyByPath[location.pathname];
+
+  const menuItems = useMemo(() => buildAntdMenuItems(menus), [menus]);
+  const pathMetaList = useMemo(() => collectMenuPathMeta(menus), [menus]);
+  const matchedMeta = useMemo(
+    () => resolveMatchedPathMeta(location.pathname, pathMetaList),
+    [location.pathname, pathMetaList]
+  );
 
   useEffect(() => {
-    if (currentParentKey) {
-      setOpenKeys((prev) =>
-        prev.includes(currentParentKey) ? prev : [currentParentKey, ...prev].slice(0, 3)
-      );
+    if (!matchedMeta) {
+      return;
     }
-  }, [currentParentKey]);
+    if (matchedMeta.parentKeys.length === 0) {
+      return;
+    }
+    setOpenKeys((prev) => {
+      const merged = [...new Set([...matchedMeta.parentKeys, ...prev])];
+      return merged.slice(0, 6);
+    });
+  }, [matchedMeta]);
 
-  const currentTitle = useMemo(() => resolveCurrentTitle(location.pathname), [location.pathname]);
+  useEffect(() => {
+    if (authError) {
+      messageApi.warning(authError);
+    }
+  }, [authError, messageApi]);
+
+  const currentTitle = matchedMeta?.title || "后台管理系统";
+  const selectedKeys = matchedMeta ? [matchedMeta.path] : [];
+  const visibleQuickActions = useMemo(
+    () => quickActions.filter((action) => hasPermission(permissions, action.requiredPerm || "")),
+    [permissions]
+  );
 
   const userMenu: MenuProps = {
     items: [
@@ -165,14 +230,20 @@ export function AdminLayout() {
       { type: "divider" },
       { key: "logout", label: "退出登录", icon: <LogoutOutlined />, danger: true }
     ],
-    onClick: ({ key }) => {
+    onClick: async ({ key }) => {
       if (key === "logout") {
-        clearAccessToken();
+        logout();
         navigate("/login", { replace: true });
         return;
       }
 
-      messageApi.info("该功能正在建设中");
+      if (key === "profile") {
+        messageApi.info("个人中心功能正在建设中");
+        return;
+      }
+
+      messageApi.info("正在刷新权限与菜单...");
+      window.location.reload();
     }
   };
 
@@ -194,20 +265,21 @@ export function AdminLayout() {
             mode="inline"
             theme="dark"
             className="admin-nav-menu"
-            selectedKeys={[location.pathname]}
+            selectedKeys={selectedKeys}
             openKeys={openKeys}
             items={menuItems}
             onOpenChange={(keys) => setOpenKeys(keys as string[])}
             onClick={({ key }) => {
-              if (String(key).startsWith("/")) {
-                navigate(String(key));
+              const path = normalizePath(String(key));
+              if (path) {
+                navigate(path);
               }
             }}
           />
 
           <div className="admin-quick-actions">
             <div className="admin-sider-section">快捷操作</div>
-            {quickActions.map((action) => (
+            {visibleQuickActions.map((action) => (
               <Button
                 key={action.key}
                 block
@@ -218,6 +290,9 @@ export function AdminLayout() {
                 {action.label}
               </Button>
             ))}
+            {!authLoading && visibleQuickActions.length === 0 ? (
+              <Typography.Text className="admin-brand__version">暂无可用快捷操作</Typography.Text>
+            ) : null}
           </div>
         </Sider>
 
@@ -258,8 +333,12 @@ export function AdminLayout() {
                 <button className="admin-user-btn" type="button">
                   <Avatar size={32} icon={<UserOutlined />} />
                   <div className="admin-user-btn__text">
-                    <Typography.Text className="admin-user-btn__name">Admin</Typography.Text>
-                    <Typography.Text className="admin-user-btn__role">管理员</Typography.Text>
+                    <Typography.Text className="admin-user-btn__name">
+                      {profile?.user.nickname || "Admin"}
+                    </Typography.Text>
+                    <Typography.Text className="admin-user-btn__role">
+                      {hasPerm("*:*:*") ? "超级管理员" : profile?.user.username || "管理员"}
+                    </Typography.Text>
                   </div>
                   <Badge status="processing" />
                 </button>

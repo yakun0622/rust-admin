@@ -15,8 +15,8 @@ use crate::modules::{
         scheduler::SchedulerManager,
         service::{
             integration::SysJobDispatcherService, ISysAuthService, ISysConfigService,
-            ISysDeptService, ISysDictService, ISysLogService, ISysMenuService,
-            ISysNoticeService, ISysPostService, ISysRoleService, ISysUserService, SysJobService,
+            ISysDeptService, ISysDictService, ISysLogService, ISysMenuService, ISysNoticeService,
+            ISysPostService, ISysRoleService, ISysUserService, SysJobService,
         },
     },
 };
@@ -91,12 +91,9 @@ impl AppState {
             Arc::new(config.clone()),
         );
         let sys_job_service = SysJobService::new(sys_job_repo, scheduler_manager.clone());
-        scheduler_manager
-            .start()
-            .await
-            .map_err(|e| -> BoxError {
-                format!("failed to start system job scheduler: {}", e.message).into()
-            })?;
+        scheduler_manager.start().await.map_err(|e| -> BoxError {
+            format!("failed to start system job scheduler: {}", e.message).into()
+        })?;
 
         Ok(Self {
             config: Arc::new(config),
@@ -159,10 +156,10 @@ impl AppState {
 
     pub async fn redis_ping(&self) -> Result<(), AppError> {
         tokio::time::timeout(
-                Duration::from_secs(self.config.redis.connection_timeout_secs),
-                self.redis_client.ping(),
-            )
-            .await
-            .map_err(|_| AppError::internal("redis connect timeout"))?
+            Duration::from_secs(self.config.redis.connection_timeout_secs),
+            self.redis_client.ping(),
+        )
+        .await
+        .map_err(|_| AppError::internal("redis connect timeout"))?
     }
 }

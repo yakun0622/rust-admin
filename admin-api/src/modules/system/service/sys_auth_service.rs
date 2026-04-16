@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet},
     sync::Arc,
     time::{SystemTime, UNIX_EPOCH},
 };
@@ -10,8 +11,18 @@ use shaku::{Component, Interface};
 
 use crate::{
     core::{
-        common::JwtClaims, converter::auth_converter::to_login_vo, dto::auth_dto::LoginReqDto,
-        errors::AppError, model::auth::UserCredentialPo, vo::auth_vo::LoginVo,
+        common::JwtClaims,
+        converter::{
+            auth_converter::{to_auth_profile_user_vo, to_login_vo},
+            sys_menu_converter::to_sys_menu_vo,
+        },
+        dto::auth_dto::LoginReqDto,
+        errors::AppError,
+        model::auth::UserCredentialPo,
+        vo::{
+            auth_vo::{AuthProfileVo, LoginVo},
+            sys_menu_vo::SysMenuVo,
+        },
     },
     modules::system::repository::ISysAuthRepository,
 };
@@ -25,6 +36,12 @@ pub trait ISysAuthService: Interface {
     ) -> Result<LoginVo, AppError>;
 
     fn verify_token(&self, token: &str) -> Result<JwtClaims, AppError>;
+    async fn profile(&self, user_id: u64) -> Result<AuthProfileVo, AppError>;
+    async fn has_permission(
+        &self,
+        user_id: u64,
+        required_permission: &str,
+    ) -> Result<bool, AppError>;
 }
 
 #[derive(Component, Clone)]
@@ -94,6 +111,46 @@ impl SysAuthService {
         .map_err(|_| AppError::unauthorized("无效或已过期的令牌"))
     }
 
+    pub async fn profile(&self, user_id: u64) -> Result<AuthProfileVo, AppError> {
+        let user = self
+            .repo
+            .get_profile_by_user_id(user_id)
+            .await?
+            .ok_or_else(|| AppError::unauthorized("用户不存在或已停用"))?;
+
+        let permissions = self.repo.list_permissions_by_user_id(user_id).await?;
+        let menus = self
+            .repo
+            .list_menus_by_user_id(user_id)
+            .await?
+            .into_iter()
+            .map(to_sys_menu_vo)
+            .collect::<Vec<_>>();
+
+        Ok(AuthProfileVo {
+            user: to_auth_profile_user_vo(user),
+            permissions,
+            menus: build_menu_tree(menus),
+        })
+    }
+
+    pub async fn has_permission(
+        &self,
+        user_id: u64,
+        required_permission: &str,
+    ) -> Result<bool, AppError> {
+        let normalized_permission = required_permission.trim();
+        if normalized_permission.is_empty() {
+            return Ok(true);
+        }
+
+        let permissions = self.repo.list_permissions_by_user_id(user_id).await?;
+        Ok(permissions.iter().any(|item| {
+            let candidate = item.trim();
+            candidate == "*:*:*" || candidate == normalized_permission
+        }))
+    }
+
     async fn append_login_log(
         &self,
         username: Option<&str>,
@@ -131,6 +188,18 @@ impl ISysAuthService for SysAuthService {
     fn verify_token(&self, token: &str) -> Result<JwtClaims, AppError> {
         self.verify_token(token)
     }
+
+    async fn profile(&self, user_id: u64) -> Result<AuthProfileVo, AppError> {
+        self.profile(user_id).await
+    }
+
+    async fn has_permission(
+        &self,
+        user_id: u64,
+        required_permission: &str,
+    ) -> Result<bool, AppError> {
+        self.has_permission(user_id, required_permission).await
+    }
 }
 
 fn verify_password(raw_password: &str, user: &UserCredentialPo) -> Result<bool, AppError> {
@@ -155,4 +224,56 @@ fn now_unix_secs() -> u64 {
         .duration_since(UNIX_EPOCH)
         .map(|value| value.as_secs())
         .unwrap_or(0)
+}
+
+fn build_menu_tree(items: Vec<SysMenuVo>) -> Vec<SysMenuVo> {
+    if items.is_empty() {
+        return Vec::new();
+    }
+
+    let mut index_by_id: HashMap<u64, usize> = HashMap::new();
+    for (index, item) in items.iter().enumerate() {
+        index_by_id.insert(item.id, index);
+    }
+
+    let mut children_map: HashMap<u64, Vec<usize>> = HashMap::new();
+    let mut root_indices = Vec::new();
+    for (index, item) in items.iter().enumerate() {
+        if item.parent_id == 0
+            || !index_by_id.contains_key(&item.parent_id)
+            || item.parent_id == item.id
+        {
+            root_indices.push(index);
+        } else {
+            children_map.entry(item.parent_id).or_default().push(index);
+        }
+    }
+
+    let mut visited = HashSet::new();
+    root_indices
+        .into_iter()
+        .map(|index| build_menu_tree_node(index, &items, &children_map, &mut visited))
+        .collect()
+}
+
+fn build_menu_tree_node(
+    index: usize,
+    items: &[SysMenuVo],
+    children_map: &HashMap<u64, Vec<usize>>,
+    visited: &mut HashSet<u64>,
+) -> SysMenuVo {
+    let mut node = items[index].clone();
+    if !visited.insert(node.id) {
+        return node;
+    }
+
+    if let Some(children_indices) = children_map.get(&node.id) {
+        node.children = children_indices
+            .iter()
+            .map(|child_index| build_menu_tree_node(*child_index, items, children_map, visited))
+            .collect();
+    }
+
+    visited.remove(&node.id);
+    node
 }

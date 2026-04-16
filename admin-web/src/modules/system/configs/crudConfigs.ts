@@ -39,6 +39,12 @@ export type SystemCrudPageConfig = {
   columns: CrudColumnConfig[];
   fields: CrudFieldConfig[];
   tree?: CrudTreeConfig;
+  permissions?: {
+    view?: string;
+    create?: string;
+    update?: string;
+    delete?: string;
+  };
 };
 
 const statusOptions: CrudSelectOption[] = [
@@ -52,6 +58,12 @@ export const systemCrudConfigs = {
     title: "用户管理",
     description: "维护系统用户账号、联系方式和状态。",
     searchPlaceholder: "按用户名、昵称搜索",
+    permissions: {
+      view: "system:user:view",
+      create: "system:user:create",
+      update: "system:user:update",
+      delete: "system:user:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "username", label: "用户名", width: 140 },
@@ -78,6 +90,12 @@ export const systemCrudConfigs = {
     title: "角色管理",
     description: "维护角色权限标识和展示顺序。",
     searchPlaceholder: "按角色名、标识搜索",
+    permissions: {
+      view: "system:role:view",
+      create: "system:role:create",
+      update: "system:role:update",
+      delete: "system:role:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "name", label: "角色名称", width: 180 },
@@ -104,6 +122,12 @@ export const systemCrudConfigs = {
     title: "菜单管理",
     description: "维护菜单显示名称、路由和组件信息。",
     searchPlaceholder: "按菜单名、路由搜索",
+    permissions: {
+      view: "system:menu:view",
+      create: "system:menu:create",
+      update: "system:menu:update",
+      delete: "system:menu:delete"
+    },
     tree: {
       enabled: true,
       parentKey: "parent_id",
@@ -147,6 +171,12 @@ export const systemCrudConfigs = {
     title: "部门管理",
     description: "维护部门负责人和联系电话。",
     searchPlaceholder: "按部门名、负责人搜索",
+    permissions: {
+      view: "system:dept:view",
+      create: "system:dept:create",
+      update: "system:dept:update",
+      delete: "system:dept:delete"
+    },
     tree: {
       enabled: true,
       parentKey: "parent_id",
@@ -187,6 +217,12 @@ export const systemCrudConfigs = {
     title: "岗位管理",
     description: "维护岗位编码、排序与启用状态。",
     searchPlaceholder: "按岗位名、编码搜索",
+    permissions: {
+      view: "system:post:view",
+      create: "system:post:create",
+      update: "system:post:update",
+      delete: "system:post:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "name", label: "岗位名称", width: 180 },
@@ -213,6 +249,12 @@ export const systemCrudConfigs = {
     title: "字典管理",
     description: "维护字典类型、标签和值。",
     searchPlaceholder: "按字典类型、标签搜索",
+    permissions: {
+      view: "system:dict:view",
+      create: "system:dict:create",
+      update: "system:dict:update",
+      delete: "system:dict:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "type", label: "字典类型", width: 180 },
@@ -239,6 +281,12 @@ export const systemCrudConfigs = {
     title: "参数设置",
     description: "维护系统运行参数和值。",
     searchPlaceholder: "按参数名、参数值搜索",
+    permissions: {
+      view: "system:config:view",
+      create: "system:config:create",
+      update: "system:config:update",
+      delete: "system:config:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "name", label: "参数名称", width: 220 },
@@ -265,6 +313,12 @@ export const systemCrudConfigs = {
     title: "通知公告",
     description: "维护公告标题、发布状态和发布人。",
     searchPlaceholder: "按标题、发布人搜索",
+    permissions: {
+      view: "system:notice:view",
+      create: "system:notice:create",
+      update: "system:notice:update",
+      delete: "system:notice:delete"
+    },
     columns: [
       { key: "id", label: "ID", width: 80 },
       { key: "title", label: "标题", width: 260 },

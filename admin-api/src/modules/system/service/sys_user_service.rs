@@ -9,7 +9,7 @@ use crate::core::{
     errors::AppError,
     vo::sys_user_vo::SysUserVo,
 };
-use crate::modules::system::repository::{DEFAULT_PASSWORD_HASH, ISysUserRepository};
+use crate::modules::system::repository::{ISysUserRepository, DEFAULT_PASSWORD_HASH};
 
 #[async_trait]
 pub trait ISysUserService: Interface {

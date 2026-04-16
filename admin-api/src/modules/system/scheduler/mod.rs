@@ -9,7 +9,9 @@ use tracing::{info, warn};
 use uuid::Uuid;
 
 use crate::{
-    core::{errors::AppError, model::monitor::JobPo, redis::RedisClient, utils::now_timestamp_millis},
+    core::{
+        errors::AppError, model::monitor::JobPo, redis::RedisClient, utils::now_timestamp_millis,
+    },
     modules::system::repository::{JobExecutionLogInput, SysJobRepository},
 };
 

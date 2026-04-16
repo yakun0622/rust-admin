@@ -25,14 +25,18 @@ impl SysMenuRepository {
         let (kw, like) = fragments::keyword_args(keyword);
         sqlx::query_as::<_, SysMenuModel>(
             r#"
-            SELECT id, parent_id, menu_name, route_path, component_path, is_visible
+            SELECT
+                id, parent_id, menu_type, menu_name, route_name, route_path, component_path,
+                perms, permission, icon, order_num, is_visible, status
             FROM sys_menu
             WHERE is_deleted = 0
-              AND (? = '' OR menu_name LIKE ? OR route_path LIKE ?)
+              AND (? = '' OR menu_name LIKE ? OR route_path LIKE ? OR permission LIKE ? OR perms LIKE ?)
             ORDER BY parent_id ASC, order_num ASC, id ASC
             "#,
         )
         .bind(&kw)
+        .bind(&like)
+        .bind(&like)
         .bind(&like)
         .bind(&like)
         .fetch_all(&self.pool)
@@ -43,7 +47,9 @@ impl SysMenuRepository {
     pub(crate) async fn get_by_id(&self, id: u64) -> Result<Option<SysMenuModel>, AppError> {
         sqlx::query_as::<_, SysMenuModel>(
             r#"
-            SELECT id, parent_id, menu_name, route_path, component_path, is_visible
+            SELECT
+                id, parent_id, menu_type, menu_name, route_name, route_path, component_path,
+                perms, permission, icon, order_num, is_visible, status
             FROM sys_menu
             WHERE id = ? AND is_deleted = 0
             LIMIT 1
@@ -57,20 +63,27 @@ impl SysMenuRepository {
 
     pub(crate) async fn insert(&self, model: &SysMenuModel) -> Result<u64, AppError> {
         self.ensure_parent_exists(model.parent_id).await?;
+        let permission = model.permission.as_deref().or(model.perms.as_deref());
         let result = sqlx::query(
             r#"
             INSERT INTO sys_menu (
-                parent_id, menu_type, menu_name, route_name, route_path, component_path,
-                perms, order_num, is_visible, status, created_by, updated_by, is_deleted
-            ) VALUES (?, 2, ?, ?, ?, ?, NULL, 0, ?, 1, 1, 1, 0)
+                parent_id, menu_type, menu_name, route_name, route_path, component_path, perms, permission,
+                icon, order_num, is_visible, status, created_by, updated_by, is_deleted
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, 1, 0)
             "#,
         )
         .bind(model.parent_id)
+        .bind(model.menu_type)
         .bind(&model.menu_name)
-        .bind(&model.menu_name)
-        .bind(model.route_path.as_deref().unwrap_or_default())
-        .bind(model.component_path.as_deref().unwrap_or_default())
+        .bind(model.route_name.as_deref())
+        .bind(model.route_path.as_deref())
+        .bind(model.component_path.as_deref())
+        .bind(permission)
+        .bind(permission)
+        .bind(model.icon.as_deref())
+        .bind(model.order_num)
         .bind(model.is_visible)
+        .bind(model.status)
         .execute(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("新增菜单失败: {err}")))?;
@@ -83,19 +96,27 @@ impl SysMenuRepository {
         model: &SysMenuModel,
     ) -> Result<bool, AppError> {
         self.ensure_parent_exists(model.parent_id).await?;
+        let permission = model.permission.as_deref().or(model.perms.as_deref());
         let result = sqlx::query(
             r#"
             UPDATE sys_menu
-            SET parent_id = ?, menu_name = ?, route_name = ?, route_path = ?, component_path = ?, is_visible = ?, updated_by = 1
+            SET parent_id = ?, menu_type = ?, menu_name = ?, route_name = ?, route_path = ?, component_path = ?,
+                perms = ?, permission = ?, icon = ?, order_num = ?, is_visible = ?, status = ?, updated_by = 1
             WHERE id = ? AND is_deleted = 0
             "#,
         )
         .bind(model.parent_id)
+        .bind(model.menu_type)
         .bind(&model.menu_name)
-        .bind(&model.menu_name)
-        .bind(model.route_path.as_deref().unwrap_or_default())
-        .bind(model.component_path.as_deref().unwrap_or_default())
+        .bind(model.route_name.as_deref())
+        .bind(model.route_path.as_deref())
+        .bind(model.component_path.as_deref())
+        .bind(permission)
+        .bind(permission)
+        .bind(model.icon.as_deref())
+        .bind(model.order_num)
         .bind(model.is_visible)
+        .bind(model.status)
         .bind(id)
         .execute(&self.pool)
         .await

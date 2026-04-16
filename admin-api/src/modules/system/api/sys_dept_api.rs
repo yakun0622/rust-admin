@@ -7,11 +7,13 @@ use axum::{
 use crate::{
     app::state::AppState,
     core::{
+        common::CurrentUser,
         dto::sys_dept_dto::{SysDeptCreateReqDto, SysDeptListQueryDto, SysDeptUpdateReqDto},
         errors::AppError,
         response::ApiResponse,
         vo::sys_dept_vo::{SysDeptDeleteVo, SysDeptListVo, SysDeptRecordVo},
     },
+    middleware::auth::ensure_permission,
 };
 
 pub struct SysDeptRouter;
@@ -26,8 +28,10 @@ impl SysDeptRouter {
 
 async fn list(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Query(query): Query<SysDeptListQueryDto>,
 ) -> Result<Json<ApiResponse<SysDeptListVo>>, AppError> {
+    ensure_permission(&state, &current_user, "system:dept:view").await?;
     let service = state.dept_service();
     let data = service.list(query.keyword.as_deref()).await?;
     Ok(Json(ApiResponse::success(data)))
@@ -35,8 +39,10 @@ async fn list(
 
 async fn create(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Json(payload): Json<SysDeptCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysDeptRecordVo>>, AppError> {
+    ensure_permission(&state, &current_user, "system:dept:create").await?;
     let service = state.dept_service();
     let item = service.create(payload).await?;
     Ok(Json(ApiResponse::success(SysDeptRecordVo { item })))
@@ -44,9 +50,11 @@ async fn create(
 
 async fn update(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Path(id): Path<u64>,
     Json(payload): Json<SysDeptUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysDeptRecordVo>>, AppError> {
+    ensure_permission(&state, &current_user, "system:dept:update").await?;
     let service = state.dept_service();
     let item = service.update_by_id(id, payload).await?;
     Ok(Json(ApiResponse::success(SysDeptRecordVo { item })))
@@ -54,8 +62,10 @@ async fn update(
 
 async fn remove(
     State(state): State<AppState>,
+    current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysDeptDeleteVo>>, AppError> {
+    ensure_permission(&state, &current_user, "system:dept:delete").await?;
     let service = state.dept_service();
     let deleted = service.delete_by_id(id).await?;
     Ok(Json(ApiResponse::success(SysDeptDeleteVo { id, deleted })))
