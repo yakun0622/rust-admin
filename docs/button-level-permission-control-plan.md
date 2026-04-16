@@ -105,7 +105,14 @@
 
 新增中间件/提取器（建议命名）：
 
-1. `require_permission("system:user:create")`
+1. `permission!(state, current_user, "system:user:create")`
+2. `admin_log!(state, current_user, "创建用户", 1_i8, async move { ... })`
+
+`admin_log` 参数约定（精简版）：
+
+1. 必填：`name`（接口名称，如“创建用户”）
+2. 必填：`business_type`（`1=新增`，`2=修改`，`3=删除`，`4=授权/其他动作`）
+3. 可选扩展：`request_params`（使用 6 参宏版本时传入）
 
 处理流程：
 
@@ -246,7 +253,7 @@ DoD：
 控制：迁移期统一读策略 + 定时比对脚本 + 上线前全量校验。
 
 2. 风险：前端只做显隐，后端未拦截导致越权。  
-控制：所有敏感写接口必须加 `require_permission`。
+控制：所有敏感写接口必须加 `permission`，并在写接口补充 `admin_log`。
 
 3. 风险：权限缓存未失效导致权限延迟生效。  
 控制：授权变更流程中强制删除对应用户缓存 key。

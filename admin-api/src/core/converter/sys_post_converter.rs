@@ -1,7 +1,5 @@
 use crate::core::{
-    dto::sys_post_dto::{SysPostCreateReqDto, SysPostUpdateReqDto},
-    errors::AppError,
-    model::sys_post::SysPostModel,
+    dto::sys_post_dto::SysPostCreateReqDto, errors::AppError, model::sys_post::SysPostModel,
     vo::sys_post_vo::SysPostVo,
 };
 
@@ -22,16 +20,6 @@ pub fn to_sys_post_vo(model: SysPostModel) -> SysPostVo {
 pub fn from_create_dto(dto: SysPostCreateReqDto) -> Result<SysPostModel, AppError> {
     Ok(SysPostModel {
         id: 0,
-        post_name: normalize_required_text("岗位名称", dto.name)?,
-        post_code: normalize_required_text("岗位编码", dto.code)?,
-        post_sort: dto.sort.unwrap_or(1),
-        status: normalize_status(dto.status.as_deref())?,
-    })
-}
-
-pub fn from_update_dto(id: u64, dto: SysPostUpdateReqDto) -> Result<SysPostModel, AppError> {
-    Ok(SysPostModel {
-        id,
         post_name: normalize_required_text("岗位名称", dto.name)?,
         post_code: normalize_required_text("岗位编码", dto.code)?,
         post_sort: dto.sort.unwrap_or(1),

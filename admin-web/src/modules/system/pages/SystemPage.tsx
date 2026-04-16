@@ -3,27 +3,35 @@ import {
   Alert,
   Button,
   Card,
+  Drawer,
   Form,
   Input,
   InputNumber,
   Modal,
   Popconfirm,
   Select,
+  Spin,
   Space,
   Table,
-  message
+  Tag,
+  Tree,
+  TreeSelect,
+  message,
+  notification
 } from "antd";
-import type { TableProps } from "antd";
+import type { TableProps, TreeProps } from "antd";
+import type { Key } from "react";
 import { useEffect, useState } from "react";
 import { useAuthSession } from "../../../app/providers";
 import { hasPermission } from "../../../core/permission";
-import { PageHeader } from "../../../shared/components/PageHeader";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import {
   createSystemRecord,
   deleteSystemRecord,
   listSystemRecords,
   updateSystemRecord,
+  listRoleMenuIds,
+  updateRoleMenuIds,
   type SystemCrudRecord
 } from "../services/systemCrudService";
 import type {
@@ -39,6 +47,24 @@ type SystemPageProps = {
 type FormValues = Record<string, string | number>;
 type TreeSystemCrudRecord = SystemCrudRecord & { children?: TreeSystemCrudRecord[] };
 type MutableTreeSystemCrudRecord = SystemCrudRecord & { children: MutableTreeSystemCrudRecord[] };
+const menuTypeLabelMap: Record<number, string> = {
+  1: "目录",
+  2: "菜单",
+  3: "按钮"
+};
+
+const statusLabelMap: Record<string, { label: string; color: string }> = {
+  enabled: { label: "启用", color: "success" },
+  disabled: { label: "停用", color: "error" },
+  published: { label: "已发布", color: "success" },
+  draft: { label: "草稿", color: "default" },
+  offline: { label: "已下线", color: "warning" }
+};
+
+const visibleLabelMap: Record<string, { label: string; color: string }> = {
+  yes: { label: "显示", color: "processing" },
+  no: { label: "隐藏", color: "default" }
+};
 
 function parseRecordId(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
@@ -133,18 +159,123 @@ function buildParentSelectOptions(
   return options;
 }
 
+function buildParentTreeData(
+  records: SystemCrudRecord[],
+  resource: string,
+  parentKey: string,
+  rootLabel: string,
+  excludeId?: number
+): any[] {
+  // Filter out buttons if it's menu resource
+  let filteredRecords = records;
+  if (resource === "menu") {
+    filteredRecords = records.filter((r) => r.menu_type !== 3);
+  }
+
+  const tree = buildTreeRecords(filteredRecords, parentKey);
+
+  function mapToTreeSelect(nodes: TreeSystemCrudRecord[]): any[] {
+    return nodes
+      .filter((node) => node.id !== excludeId)
+      .map((node) => ({
+        title: node.name,
+        value: node.id,
+        children: node.children ? mapToTreeSelect(node.children) : []
+      }));
+  }
+
+  return [
+    {
+      title: rootLabel,
+      value: 0,
+      children: mapToTreeSelect(tree)
+    }
+  ];
+}
+
+function normalizeOptionalText(value: unknown): string | undefined {
+  if (typeof value !== "string") {
+    return undefined;
+  }
+  const normalized = value.trim();
+  return normalized ? normalized : undefined;
+}
+
+function parseNumberValue(value: unknown, fallback: number): number {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === "string") {
+    const parsed = Number(value.trim());
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  return fallback;
+}
+
+function buildSubmitPayload(resource: string, values: FormValues): Record<string, unknown> {
+  if (resource !== "menu") {
+    return values;
+  }
+
+  const menuType = parseNumberValue(values.menu_type, 2);
+  const parentId = parseNumberValue(values.parent_id, 0);
+  const orderNum = parseNumberValue(values.order_num, 1);
+
+  const name = normalizeOptionalText(values.name);
+  if (!name) {
+    throw new Error("菜单名称不能为空");
+  }
+
+  const routeName = normalizeOptionalText(values.route_name);
+  const path = normalizeOptionalText(values.path);
+  const component = normalizeOptionalText(values.component);
+  const permission = normalizeOptionalText(values.permission);
+  const icon = normalizeOptionalText(values.icon);
+
+  if (menuType === 2 && (!path || !component)) {
+    throw new Error("菜单类型为“菜单”时，路由地址和组件名不能为空");
+  }
+  if (menuType === 3 && !permission) {
+    throw new Error("菜单类型为“按钮”时，权限标识不能为空");
+  }
+
+  return {
+    parent_id: parentId,
+    menu_type: menuType,
+    name,
+    route_name: menuType === 3 ? undefined : routeName,
+    path: menuType === 3 ? undefined : path,
+    component: menuType === 3 ? undefined : component,
+    permission,
+    icon,
+    order_num: orderNum,
+    status: normalizeOptionalText(values.status) || "enabled",
+    visible: normalizeOptionalText(values.visible) || "yes"
+  };
+}
+
 export function SystemPage({ config }: SystemPageProps) {
   const [form] = Form.useForm<FormValues>();
-  const [messageApi, contextHolder] = message.useMessage();
+  const [searchForm] = Form.useForm();
+  const [messageApi, messageContext] = message.useMessage();
+  const [notificationApi, notificationContext] = notification.useNotification();
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [records, setRecords] = useState<SystemCrudRecord[]>([]);
   const [total, setTotal] = useState(0);
-  const [keywordInput, setKeywordInput] = useState("");
-  const [keyword, setKeyword] = useState("");
+  const [searchParams, setSearchParams] = useState<Record<string, unknown>>({});
   const [editingRecord, setEditingRecord] = useState<SystemCrudRecord | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
+
+  const [configuringRole, setConfiguringRole] = useState<SystemCrudRecord | null>(null);
+  const [permissionDrawerOpen, setPermissionDrawerOpen] = useState(false);
+  const [menuTreeData, setMenuTreeData] = useState<TreeSystemCrudRecord[]>([]);
+  const [checkedMenuIds, setCheckedMenuIds] = useState<Key[]>([]);
+  const [permissionLoading, setPermissionLoading] = useState(false);
+
   const { permissions: userPerms, loading: authLoading } = useAuthSession();
   const permissionConfig = config.permissions || {};
   const canView = hasPermission(userPerms, permissionConfig.view || "");
@@ -170,13 +301,24 @@ export function SystemPage({ config }: SystemPageProps) {
       ? buildParentSelectOptions(records, treeParentKey, treeParentRootLabel, editingRecord?.id)
       : [];
 
+  const parentTreeData =
+    isTreeMode && activeFields.some((field) => field.key === treeParentKey)
+      ? buildParentTreeData(
+          records,
+          config.resource,
+          treeParentKey,
+          treeParentRootLabel,
+          editingRecord?.id
+        )
+      : [];
+
   useDocumentTitle(`${config.title} - Rust Admin`);
 
-  async function loadData(currentKeyword: string) {
+  async function loadData(params: Record<string, unknown>) {
     setLoading(true);
     setError(null);
     try {
-      const data = await listSystemRecords(config.resource, currentKeyword);
+      const data = await listSystemRecords(config.resource, params);
       setRecords(data.items);
       setTotal(data.total);
     } catch (err) {
@@ -198,8 +340,8 @@ export function SystemPage({ config }: SystemPageProps) {
       setLoading(false);
       return;
     }
-    void loadData(keyword);
-  }, [authLoading, canView, config.resource, keyword]);
+    void loadData(searchParams);
+  }, [authLoading, canView, config.resource, searchParams]);
 
   function openCreateModal() {
     if (!canCreate) {
@@ -250,7 +392,7 @@ export function SystemPage({ config }: SystemPageProps) {
     try {
       await deleteSystemRecord(config.resource, record.id);
       messageApi.success("删除成功");
-      await loadData(keyword);
+      await loadData(searchParams);
     } catch (err) {
       messageApi.error(err instanceof Error ? err.message : "删除失败");
     }
@@ -268,22 +410,66 @@ export function SystemPage({ config }: SystemPageProps) {
 
     try {
       const values = await form.validateFields(activeFields.map((field) => field.key));
+      const payload = buildSubmitPayload(config.resource, values);
       setSaving(true);
       if (editingRecord) {
-        await updateSystemRecord(config.resource, editingRecord.id, values);
+        await updateSystemRecord(config.resource, editingRecord.id, payload);
         messageApi.success("更新成功");
       } else {
-        await createSystemRecord(config.resource, values);
+        await createSystemRecord(config.resource, payload);
         messageApi.success("新增成功");
       }
       closeModal();
-      await loadData(keyword);
+      await loadData(searchParams);
     } catch (err) {
       if (err instanceof Error) {
         messageApi.error(err.message || "提交失败");
       }
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function openPermissionDrawer(record: SystemCrudRecord) {
+    setConfiguringRole(record);
+    setPermissionDrawerOpen(true);
+    setPermissionLoading(true);
+    try {
+      // Fetch all menus for the tree
+      const menuRes = await listSystemRecords("menu");
+      const tree = buildTreeRecords(menuRes.items, "parent_id");
+      setMenuTreeData(tree);
+
+      // Fetch current checked menu IDs for the role
+      const checkedIds = await listRoleMenuIds(record.id);
+      setCheckedMenuIds(checkedIds.map(id => id.toString()));
+    } catch (err) {
+      messageApi.error(err instanceof Error ? err.message : "获取权限数据失败");
+    } finally {
+      setPermissionLoading(false);
+    }
+  }
+
+  async function handlePermissionSave() {
+    if (!configuringRole) return;
+    setPermissionLoading(true);
+    try {
+      const menuIds = checkedMenuIds.map(id => Number(id)).filter(id => !isNaN(id));
+      await updateRoleMenuIds(configuringRole.id, menuIds);
+      notificationApi.success({
+        message: "权限分配成功",
+        description: `角色「${configuringRole.role_name || configuringRole.name}」的权限已成功更新。`,
+        placement: "topRight"
+      });
+      setPermissionDrawerOpen(false);
+    } catch (err) {
+      notificationApi.error({
+        message: "保存权限失败",
+        description: err instanceof Error ? err.message : "未知错误",
+        placement: "topRight"
+      });
+    } finally {
+      setPermissionLoading(false);
     }
   }
 
@@ -301,6 +487,18 @@ export function SystemPage({ config }: SystemPageProps) {
         />
       );
     }
+    if (field.type === "tree-select") {
+      const isParentField = isTreeMode && field.key === treeParentKey;
+      return (
+        <TreeSelect
+          treeData={isParentField ? parentTreeData : []}
+          placeholder={field.placeholder || `请选择${field.label}`}
+          allowClear={!field.required}
+          treeDefaultExpandAll
+          style={{ width: "100%" }}
+        />
+      );
+    }
     if (field.type === "number") {
       return (
         <InputNumber
@@ -313,6 +511,15 @@ export function SystemPage({ config }: SystemPageProps) {
 
     return <Input placeholder={field.placeholder || `请输入${field.label}`} />;
   }
+ 
+  function handleSearch(values: any) {
+    setSearchParams(values);
+  }
+ 
+  function handleReset() {
+    searchForm.resetFields();
+    setSearchParams({});
+  }
 
   const columns: TableProps<SystemCrudRecord>["columns"] = [
     ...config.columns.map((column) => ({
@@ -322,6 +529,36 @@ export function SystemPage({ config }: SystemPageProps) {
       width: column.width,
       ellipsis: column.ellipsis ?? true,
       render: (value: unknown) => {
+        if (config.resource === "menu" && column.key === "menu_type") {
+          const menuType = parseNumberValue(value, 0);
+          const label = menuTypeLabelMap[menuType] || "-";
+          const color = menuType === 1 ? "blue" : menuType === 2 ? "green" : "orange";
+          return <Tag color={color}>{label}</Tag>;
+        }
+
+        if (column.key === "type") {
+          const strValue = String(value);
+          if (strValue === "通知" || strValue === "公告") {
+            return <Tag color={strValue === "公告" ? "volcano" : "cyan"}>{strValue}</Tag>;
+          }
+        }
+        
+        if (column.key === "status") {
+          const strValue = String(value);
+          const mapping = statusLabelMap[strValue];
+          if (mapping) {
+            return <Tag color={mapping.color}>{mapping.label}</Tag>;
+          }
+        }
+
+        if (column.key === "visible") {
+          const strValue = String(value);
+          const mapping = visibleLabelMap[strValue];
+          if (mapping) {
+            return <Tag color={mapping.color}>{mapping.label}</Tag>;
+          }
+        }
+
         if (value === undefined || value === null) {
           return "-";
         }
@@ -350,6 +587,15 @@ export function SystemPage({ config }: SystemPageProps) {
                 编辑
               </Button>
             ) : null}
+            {config.resource === "role" && canUpdate ? (
+              <Button
+                type="link"
+                size="small"
+                onClick={() => openPermissionDrawer(record)}
+              >
+                权限
+              </Button>
+            ) : null}
             {canDelete ? (
               <Popconfirm title="确认删除这条记录吗？" onConfirm={() => handleDelete(record)}>
                 <Button type="link" size="small" danger icon={<DeleteOutlined />}>
@@ -365,8 +611,8 @@ export function SystemPage({ config }: SystemPageProps) {
 
   return (
     <div className="biz-page">
-      {contextHolder}
-      <PageHeader title={config.title} description={config.description} />
+      {messageContext}
+      {notificationContext}
       {error ? (
         <Alert
           type="error"
@@ -387,41 +633,63 @@ export function SystemPage({ config }: SystemPageProps) {
       ) : null}
       {authLoading || canView ? (
         <Card>
-        <Space style={{ width: "100%", justifyContent: "space-between", marginBottom: 16 }}>
-          <Space>
-            <Input.Search
-              allowClear
-              value={keywordInput}
-              placeholder={config.searchPlaceholder}
-              onChange={(event) => setKeywordInput(event.target.value)}
-              onSearch={(value) => setKeyword(value.trim())}
-              style={{ width: 280 }}
-            />
-            <Button onClick={() => {
-              setKeywordInput("");
-              setKeyword("");
-            }}>
-              重置
-            </Button>
-          </Space>
-          {canCreate ? (
-            <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
-              新增
-            </Button>
-          ) : (
-            <span />
-          )}
-        </Space>
-        <Table<SystemCrudRecord>
-          rowKey="id"
-          loading={loading}
-          columns={columns}
-          dataSource={dataSource}
-          pagination={isTreeMode ? false : { total, pageSize: 10, showSizeChanger: false }}
-          scroll={{ x: 1000 }}
-          defaultExpandAllRows={isTreeMode ? treeConfig?.expandAllByDefault ?? true : false}
-        />
-      </Card>
+          <div style={{ marginBottom: 16 }}>
+            {config.searchFields && config.searchFields.length > 0 ? (
+              <Form
+                form={searchForm}
+                layout="inline"
+                onFinish={handleSearch}
+                style={{ rowGap: 12 }}
+              >
+                {config.searchFields.map((field) => (
+                  <Form.Item key={field.key} name={field.key} label={field.label}>
+                    {renderFormControl(field)}
+                  </Form.Item>
+                ))}
+                <Form.Item>
+                  <Space>
+                    <Button type="primary" htmlType="submit">
+                      查询
+                    </Button>
+                    <Button onClick={handleReset}>重置</Button>
+                  </Space>
+                </Form.Item>
+                {canCreate ? (
+                  <Form.Item style={{ marginLeft: "auto", marginRight: 0 }}>
+                    <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+                      新增
+                    </Button>
+                  </Form.Item>
+                ) : null}
+              </Form>
+            ) : (
+              <Space style={{ width: "100%", justifyContent: "space-between" }}>
+                <Space>
+                  <Input.Search
+                    allowClear
+                    placeholder={config.searchPlaceholder}
+                    onSearch={(value) => setSearchParams({ keyword: value.trim() })}
+                    style={{ width: 280 }}
+                  />
+                </Space>
+                {canCreate ? (
+                  <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
+                    新增
+                  </Button>
+                ) : null}
+              </Space>
+            )}
+          </div>
+          <Table<SystemCrudRecord>
+            rowKey="id"
+            loading={loading}
+            columns={columns}
+            dataSource={dataSource}
+            pagination={isTreeMode ? false : { total, pageSize: 10, showSizeChanger: false }}
+            scroll={{ x: 1000 }}
+            defaultExpandAllRows={isTreeMode ? treeConfig?.expandAllByDefault ?? true : false}
+          />
+        </Card>
       ) : null}
 
       <Modal
@@ -452,6 +720,46 @@ export function SystemPage({ config }: SystemPageProps) {
           ))}
         </Form>
       </Modal>
+
+      <Drawer
+        title={`分配权限 - ${configuringRole?.role_name || configuringRole?.name || ""}`}
+        placement="right"
+        width={420}
+        onClose={() => setPermissionDrawerOpen(false)}
+        open={permissionDrawerOpen}
+        extra={
+          <Space>
+            <Button onClick={() => setPermissionDrawerOpen(false)}>取消</Button>
+            <Button type="primary" loading={permissionLoading} onClick={handlePermissionSave}>
+              提交
+            </Button>
+          </Space>
+        }
+      >
+        <Spin spinning={permissionLoading}>
+          <Tree
+            checkable
+            checkStrictly
+            treeData={menuTreeData.map(node => {
+              const wrapNode = (n: TreeSystemCrudRecord): any => ({
+                title: n.menu_name || n.name,
+                key: n.id.toString(),
+                children: n.children?.map(wrapNode)
+              });
+              return wrapNode(node);
+            })}
+            checkedKeys={checkedMenuIds}
+            onCheck={(checked) => {
+              if (Array.isArray(checked)) {
+                setCheckedMenuIds(checked);
+              } else {
+                setCheckedMenuIds(checked.checked);
+              }
+            }}
+            defaultExpandAll
+          />
+        </Spin>
+      </Drawer>
     </div>
   );
 }

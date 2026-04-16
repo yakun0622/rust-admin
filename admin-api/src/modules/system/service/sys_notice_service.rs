@@ -5,7 +5,7 @@ use serde_json::{json, Value};
 use shaku::{Component, Interface};
 
 use crate::core::{
-    dto::system_dto::{SysNoticeCreateReqDto, SysNoticeUpdateReqDto},
+    dto::sys_notice_dto::{SysNoticeCreateReqDto, SysNoticeListQueryDto, SysNoticeUpdateReqDto},
     errors::AppError,
     model::system::SysNoticePo,
     vo::system_vo::SystemCrudListVo,
@@ -14,7 +14,7 @@ use crate::modules::system::repository::ISysNoticeRepository;
 
 #[async_trait]
 pub trait ISysNoticeService: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError>;
+    async fn list(&self, query: SysNoticeListQueryDto) -> Result<SystemCrudListVo, AppError>;
     async fn create(&self, dto: SysNoticeCreateReqDto) -> Result<Value, AppError>;
     async fn update_by_id(&self, id: u64, dto: SysNoticeUpdateReqDto) -> Result<Value, AppError>;
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
@@ -28,10 +28,10 @@ pub struct SysNoticeService {
 }
 
 impl SysNoticeService {
-    pub async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError> {
+    pub async fn list(&self, query: SysNoticeListQueryDto) -> Result<SystemCrudListVo, AppError> {
         let items = self
             .repo
-            .list(keyword)
+            .list(query)
             .await?
             .into_iter()
             .map(notice_to_value)
@@ -44,12 +44,13 @@ impl SysNoticeService {
     }
 
     pub async fn create(&self, dto: SysNoticeCreateReqDto) -> Result<Value, AppError> {
-        let title = required_text("公告标题", dto.title)?;
-        let notice_type = normalize_notice_type(dto.notice_type.as_deref())?;
-        let status = normalize_notice_status(dto.status.as_deref())?;
+        let normalized = normalize_create_dto(dto)?;
+        let title = required_text("公告标题", normalized.title)?;
+        let notice_type = normalize_notice_type(normalized.notice_type.as_deref())?;
+        let status = normalize_notice_status(normalized.status.as_deref())?;
         let id = self
             .repo
-            .insert(&title, notice_type, status, dto.publisher.as_deref())
+            .insert(&title, notice_type, status, normalized.publisher.as_deref())
             .await?;
         let created = self
             .repo
@@ -64,13 +65,8 @@ impl SysNoticeService {
         id: u64,
         dto: SysNoticeUpdateReqDto,
     ) -> Result<Value, AppError> {
-        let title = required_text("公告标题", dto.title)?;
-        let notice_type = normalize_notice_type(dto.notice_type.as_deref())?;
-        let status = normalize_notice_status(dto.status.as_deref())?;
-        let affected = self
-            .repo
-            .update_by_id(id, &title, notice_type, status, dto.publisher.as_deref())
-            .await?;
+        let normalized = normalize_update_dto(dto)?;
+        let affected = self.repo.update_by_id(id, normalized).await?;
         if !affected {
             return Err(AppError::not_found(format!(
                 "notice 资源中不存在 id={id} 的记录"
@@ -97,8 +93,8 @@ impl SysNoticeService {
 
 #[async_trait]
 impl ISysNoticeService for SysNoticeService {
-    async fn list(&self, keyword: Option<&str>) -> Result<SystemCrudListVo, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysNoticeListQueryDto) -> Result<SystemCrudListVo, AppError> {
+        self.list(query).await
     }
 
     async fn create(&self, dto: SysNoticeCreateReqDto) -> Result<Value, AppError> {
@@ -130,6 +126,45 @@ fn required_text(field_name: &str, raw: String) -> Result<String, AppError> {
         return Err(AppError::bad_request(format!("{field_name}不能为空")));
     }
     Ok(normalized)
+}
+
+fn normalize_create_dto(mut dto: SysNoticeCreateReqDto) -> Result<SysNoticeCreateReqDto, AppError> {
+    dto.title = required_text("公告标题", dto.title)?;
+    dto.notice_type = Some(normalize_notice_type(dto.notice_type.as_deref())?.to_string());
+    dto.status = Some(normalize_notice_status(dto.status.as_deref())?.to_string());
+    dto.publisher = dto
+        .publisher
+        .and_then(|publisher| normalize_optional_text(publisher.as_str()).map(ToString::to_string));
+    Ok(dto)
+}
+
+fn normalize_update_dto(mut dto: SysNoticeUpdateReqDto) -> Result<SysNoticeUpdateReqDto, AppError> {
+    dto.title = match dto.title {
+        Some(title) => Some(required_text("公告标题", title)?),
+        None => None,
+    };
+    dto.notice_type = match dto.notice_type {
+        Some(notice_type) => Some(normalize_notice_type(Some(notice_type.trim()))?.to_string()),
+        None => None,
+    };
+    dto.status = match dto.status {
+        Some(status) => Some(normalize_notice_status(Some(status.trim()))?.to_string()),
+        None => None,
+    };
+    dto.publisher = match dto.publisher {
+        Some(publisher) => Some(publisher.trim().to_string()),
+        None => None,
+    };
+    Ok(dto)
+}
+
+fn normalize_optional_text(raw: &str) -> Option<&str> {
+    let normalized = raw.trim();
+    if normalized.is_empty() {
+        None
+    } else {
+        Some(normalized)
+    }
 }
 
 fn normalize_notice_type(raw: Option<&str>) -> Result<i16, AppError> {

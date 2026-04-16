@@ -3,7 +3,7 @@ export type CrudSelectOption = {
   value: string | number;
 };
 
-export type CrudFieldType = "input" | "textarea" | "select" | "number";
+export type CrudFieldType = "input" | "textarea" | "select" | "number" | "tree-select";
 
 export type CrudFieldConfig = {
   key: string;
@@ -38,6 +38,7 @@ export type SystemCrudPageConfig = {
   searchPlaceholder: string;
   columns: CrudColumnConfig[];
   fields: CrudFieldConfig[];
+  searchFields?: CrudFieldConfig[];
   tree?: CrudTreeConfig;
   permissions?: {
     view?: string;
@@ -83,6 +84,12 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "username", label: "用户名" },
+      { key: "nickname", label: "昵称" },
+      { key: "phone", label: "手机号" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   role: {
@@ -115,13 +122,18 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "name", label: "角色名称" },
+      { key: "key", label: "权限标识" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   menu: {
     resource: "menu",
     title: "菜单管理",
-    description: "维护菜单显示名称、路由和组件信息。",
-    searchPlaceholder: "按菜单名、路由搜索",
+    description: "维护菜单类型、路由、组件和权限标识。",
+    searchPlaceholder: "按菜单名、路由、权限标识搜索",
     permissions: {
       view: "system:menu:view",
       create: "system:menu:create",
@@ -136,23 +148,49 @@ export const systemCrudConfigs = {
     },
     columns: [
       { key: "id", label: "ID", width: 80 },
+      { key: "menu_type", label: "类型", width: 90 },
       { key: "name", label: "菜单名称", width: 180 },
       { key: "path", label: "路由", width: 180 },
       { key: "component", label: "组件", width: 180 },
+      { key: "permission", label: "权限标识", width: 220 },
+      { key: "status", label: "状态", width: 120 },
       { key: "visible", label: "是否可见", width: 120 }
     ],
     fields: [
       {
         key: "parent_id",
         label: "上级菜单",
-        type: "select",
+        type: "tree-select",
         required: true,
-        createOnly: true,
         defaultValue: 0
       },
+      {
+        key: "menu_type",
+        label: "菜单类型",
+        type: "select",
+        required: true,
+        options: [
+          { label: "目录", value: 1 },
+          { label: "菜单", value: 2 },
+          { label: "按钮", value: 3 }
+        ],
+        defaultValue: 2
+      },
       { key: "name", label: "菜单名称", required: true },
-      { key: "path", label: "路由地址", required: true },
-      { key: "component", label: "组件名", required: true },
+      { key: "route_name", label: "路由名称" },
+      { key: "path", label: "路由地址" },
+      { key: "component", label: "组件名" },
+      { key: "permission", label: "权限标识" },
+      { key: "icon", label: "菜单图标" },
+      { key: "order_num", label: "显示排序", type: "number", defaultValue: 1 },
+      {
+        key: "status",
+        label: "状态",
+        type: "select",
+        required: true,
+        options: statusOptions,
+        defaultValue: "enabled"
+      },
       {
         key: "visible",
         label: "是否可见",
@@ -164,6 +202,10 @@ export const systemCrudConfigs = {
         ],
         defaultValue: "yes"
       }
+    ],
+    searchFields: [
+      { key: "name", label: "菜单名称" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   dept: {
@@ -194,7 +236,7 @@ export const systemCrudConfigs = {
       {
         key: "parent_id",
         label: "上级部门",
-        type: "select",
+        type: "tree-select",
         required: true,
         createOnly: true,
         defaultValue: 0
@@ -210,6 +252,10 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "name", label: "部门名称" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   post: {
@@ -242,6 +288,11 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "name", label: "岗位名称" },
+      { key: "code", label: "岗位编码" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   dict: {
@@ -274,6 +325,11 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "dict_type", label: "字典类型" },
+      { key: "dict_label", label: "字典标签" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   config: {
@@ -306,6 +362,11 @@ export const systemCrudConfigs = {
         options: statusOptions,
         defaultValue: "enabled"
       }
+    ],
+    searchFields: [
+      { key: "name", label: "参数名称" },
+      { key: "key", label: "参数键名" },
+      { key: "status", label: "状态", type: "select", options: statusOptions }
     ]
   },
   notice: {
@@ -351,6 +412,28 @@ export const systemCrudConfigs = {
         defaultValue: "draft"
       },
       { key: "publisher", label: "发布人", required: true }
+    ],
+    searchFields: [
+      { key: "title", label: "公告标题" },
+      {
+        key: "notice_type",
+        label: "公告类型",
+        type: "select",
+        options: [
+          { label: "通知", value: "1" },
+          { label: "公告", value: "2" }
+        ]
+      },
+      {
+        key: "status",
+        label: "公告状态",
+        type: "select",
+        options: [
+          { label: "草稿", value: "0" },
+          { label: "已发布", value: "1" },
+          { label: "已下线", value: "2" }
+        ]
+      }
     ]
   }
 } satisfies Record<string, SystemCrudPageConfig>;

@@ -1,8 +1,6 @@
 use crate::core::{
-    dto::sys_config_dto::{SysConfigCreateReqDto, SysConfigUpdateReqDto},
-    errors::AppError,
-    model::sys_config::SysConfigModel,
-    vo::sys_config_vo::SysConfigVo,
+    dto::sys_config_dto::SysConfigCreateReqDto, errors::AppError,
+    model::sys_config::SysConfigModel, vo::sys_config_vo::SysConfigVo,
 };
 
 pub fn to_sys_config_vo(model: SysConfigModel) -> SysConfigVo {
@@ -23,18 +21,6 @@ pub fn from_create_dto(dto: SysConfigCreateReqDto) -> Result<SysConfigModel, App
     let name = normalize_required_text("参数名称", dto.name)?;
     Ok(SysConfigModel {
         id: 0,
-        config_name: name.clone(),
-        config_key: name,
-        config_value: normalize_required_text("参数值", dto.value)?,
-        remark: normalize_optional_text(dto.remark),
-        status: normalize_status(dto.status.as_deref())?,
-    })
-}
-
-pub fn from_update_dto(id: u64, dto: SysConfigUpdateReqDto) -> Result<SysConfigModel, AppError> {
-    let name = normalize_required_text("参数名称", dto.name)?;
-    Ok(SysConfigModel {
-        id,
         config_name: name.clone(),
         config_key: name,
         config_value: normalize_required_text("参数值", dto.value)?,

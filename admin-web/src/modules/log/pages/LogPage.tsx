@@ -1,7 +1,6 @@
 import { Alert, Button, Card, Input, Space, Table } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useState } from "react";
-import { PageHeader } from "../../../shared/components/PageHeader";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import { getLoginLogs, getOperLogs, type LoginLogItem, type OperLogItem } from "../services/logService";
 
@@ -57,6 +56,7 @@ export function LogPage({ title, type }: LogPageProps) {
     { title: "请求方式", dataIndex: "request_method", width: 120 },
     { title: "操作人", dataIndex: "oper_name", width: 140 },
     { title: "IP", dataIndex: "ip", width: 140 },
+    { title: "操作地点", dataIndex: "location", width: 180 },
     { title: "状态", dataIndex: "status", width: 110 },
     { title: "耗时(ms)", dataIndex: "duration_ms", width: 110 },
     {
@@ -72,6 +72,7 @@ export function LogPage({ title, type }: LogPageProps) {
     { title: "用户名", dataIndex: "username", width: 140 },
     { title: "类型", dataIndex: "login_type", width: 120 },
     { title: "IP", dataIndex: "ip", width: 160 },
+    { title: "登录地点", dataIndex: "location", width: 180 },
     { title: "状态", dataIndex: "status", width: 100 },
     { title: "消息", dataIndex: "message", width: 220, ellipsis: true },
     {
@@ -84,7 +85,6 @@ export function LogPage({ title, type }: LogPageProps) {
 
   return (
     <div className="biz-page">
-      <PageHeader title={title} description="支持关键字检索和日志列表查看。" />
       {error ? (
         <Alert
           type="error"

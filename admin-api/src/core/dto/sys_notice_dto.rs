@@ -1,11 +1,13 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct SysNoticeListQueryDto {
-    pub keyword: Option<String>,
+    pub title: Option<String>,
+    pub notice_type: Option<String>,
+    pub status: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysNoticeCreateReqDto {
     pub title: String,
     #[serde(rename = "type")]
@@ -14,9 +16,9 @@ pub struct SysNoticeCreateReqDto {
     pub publisher: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysNoticeUpdateReqDto {
-    pub title: String,
+    pub title: Option<String>,
     #[serde(rename = "type")]
     pub notice_type: Option<String>,
     pub status: Option<String>,

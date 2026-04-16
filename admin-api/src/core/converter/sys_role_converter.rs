@@ -1,7 +1,5 @@
 use crate::core::{
-    dto::sys_role_dto::{SysRoleCreateReqDto, SysRoleUpdateReqDto},
-    errors::AppError,
-    model::sys_role::SysRoleModel,
+    dto::sys_role_dto::SysRoleCreateReqDto, errors::AppError, model::sys_role::SysRoleModel,
     vo::sys_role_vo::SysRoleVo,
 };
 
@@ -22,16 +20,6 @@ pub fn to_sys_role_vo(model: SysRoleModel) -> SysRoleVo {
 pub fn from_create_dto(dto: SysRoleCreateReqDto) -> Result<SysRoleModel, AppError> {
     Ok(SysRoleModel {
         id: 0,
-        role_name: normalize_required_text("角色名称", dto.name)?,
-        role_key: normalize_required_text("权限标识", dto.key)?,
-        role_sort: dto.sort.unwrap_or(1),
-        status: normalize_status(dto.status.as_deref())?,
-    })
-}
-
-pub fn from_update_dto(id: u64, dto: SysRoleUpdateReqDto) -> Result<SysRoleModel, AppError> {
-    Ok(SysRoleModel {
-        id,
         role_name: normalize_required_text("角色名称", dto.name)?,
         role_key: normalize_required_text("权限标识", dto.key)?,
         role_sort: dto.sort.unwrap_or(1),

@@ -1,11 +1,12 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct SysMenuListQueryDto {
-    pub keyword: Option<String>,
+    pub name: Option<String>,
+    pub status: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysMenuCreateReqDto {
     pub parent_id: u64,
     pub menu_type: Option<i16>,
@@ -20,7 +21,7 @@ pub struct SysMenuCreateReqDto {
     pub visible: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysMenuUpdateReqDto {
     pub parent_id: Option<u64>,
     pub menu_type: Option<i16>,

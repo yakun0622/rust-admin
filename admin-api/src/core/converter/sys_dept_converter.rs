@@ -1,7 +1,5 @@
 use crate::core::{
-    dto::sys_dept_dto::{SysDeptCreateReqDto, SysDeptUpdateReqDto},
-    errors::AppError,
-    model::sys_dept::SysDeptModel,
+    dto::sys_dept_dto::SysDeptCreateReqDto, errors::AppError, model::sys_dept::SysDeptModel,
     vo::sys_dept_vo::SysDeptVo,
 };
 
@@ -24,21 +22,6 @@ pub fn from_create_dto(dto: SysDeptCreateReqDto) -> Result<SysDeptModel, AppErro
     Ok(SysDeptModel {
         id: 0,
         parent_id: dto.parent_id,
-        dept_name: normalize_required_text("部门名称", dto.name)?,
-        leader: normalize_optional_text(dto.leader),
-        phone: normalize_optional_text(dto.phone),
-        status: normalize_status(dto.status.as_deref())?,
-    })
-}
-
-pub fn from_update_dto(
-    id: u64,
-    parent_id: u64,
-    dto: SysDeptUpdateReqDto,
-) -> Result<SysDeptModel, AppError> {
-    Ok(SysDeptModel {
-        id,
-        parent_id,
         dept_name: normalize_required_text("部门名称", dto.name)?,
         leader: normalize_optional_text(dto.leader),
         phone: normalize_optional_text(dto.phone),

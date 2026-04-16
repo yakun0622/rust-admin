@@ -13,7 +13,6 @@ use crate::{
         response::ApiResponse,
         vo::log_vo::{LoginLogListVo, OperLogListVo},
     },
-    middleware::auth::ensure_permission,
 };
 
 pub struct SysLogRouter;
@@ -31,7 +30,7 @@ async fn oper_logs(
     current_user: CurrentUser,
     Query(query): Query<LogListQueryDto>,
 ) -> Result<Json<ApiResponse<OperLogListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "log:oper:view").await?;
+    crate::permission!(state, current_user, "log:oper:view");
     Ok(Json(ApiResponse::success(
         state
             .log_service()
@@ -45,7 +44,7 @@ async fn login_logs(
     current_user: CurrentUser,
     Query(query): Query<LogListQueryDto>,
 ) -> Result<Json<ApiResponse<LoginLogListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "log:login:view").await?;
+    crate::permission!(state, current_user, "log:login:view");
     Ok(Json(ApiResponse::success(
         state
             .log_service()

@@ -1,6 +1,5 @@
 use crate::core::{
-    dto::sys_user_dto::{SysUserCreateReqDto, SysUserUpdateReqDto},
-    model::sys_user::SysUserModel,
+    dto::sys_user_dto::SysUserCreateReqDto, model::sys_user::SysUserModel,
     vo::sys_user_vo::SysUserVo,
 };
 
@@ -25,21 +24,6 @@ pub fn from_create_dto(dto: SysUserCreateReqDto, password_hash: &str) -> SysUser
         nickname: dto.nickname,
         phone: dto.phone,
         status: status_text_to_value(dto.status.as_deref()),
-        password_hash: password_hash.to_string(),
-        created_by: 1,
-        updated_by: 1,
-        is_deleted: 0,
-    }
-}
-
-pub fn from_update_dto(id: u64, dto: SysUserUpdateReqDto, password_hash: &str) -> SysUserModel {
-    SysUserModel {
-        id,
-        username: dto.username,
-        nickname: dto.nickname,
-        phone: dto.phone,
-        status: status_text_to_value(dto.status.as_deref()),
-        // update 流程不会更新 password_hash，保留占位即可满足模型字段完整性。
         password_hash: password_hash.to_string(),
         created_by: 1,
         updated_by: 1,

@@ -1,4 +1,5 @@
 use crate::core::dbal::query::fragments;
+use crate::core::dto::sys_menu_dto::SysMenuListQueryDto;
 use async_trait::async_trait;
 use shaku::{Component, Interface};
 use sqlx::MySqlPool;
@@ -7,7 +8,7 @@ use crate::core::{errors::AppError, model::sys_menu::SysMenuModel};
 
 #[async_trait]
 pub trait ISysMenuRepository: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysMenuModel>, AppError>;
+    async fn list(&self, query: SysMenuListQueryDto) -> Result<Vec<SysMenuModel>, AppError>;
     async fn get_by_id(&self, id: u64) -> Result<Option<SysMenuModel>, AppError>;
     async fn insert(&self, model: &SysMenuModel) -> Result<u64, AppError>;
     async fn update_by_id(&self, id: u64, model: &SysMenuModel) -> Result<bool, AppError>;
@@ -21,8 +22,13 @@ pub(crate) struct SysMenuRepository {
 }
 
 impl SysMenuRepository {
-    pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysMenuModel>, AppError> {
-        let (kw, like) = fragments::keyword_args(keyword);
+    pub(crate) async fn list(
+        &self,
+        query: SysMenuListQueryDto,
+    ) -> Result<Vec<SysMenuModel>, AppError> {
+        let (name_kw, name_like) = fragments::keyword_args(query.name.as_deref());
+        let status = query.status.filter(|s| !s.trim().is_empty());
+
         sqlx::query_as::<_, SysMenuModel>(
             r#"
             SELECT
@@ -30,15 +36,15 @@ impl SysMenuRepository {
                 perms, permission, icon, order_num, is_visible, status
             FROM sys_menu
             WHERE is_deleted = 0
-              AND (? = '' OR menu_name LIKE ? OR route_path LIKE ? OR permission LIKE ? OR perms LIKE ?)
+              AND (? = '' OR menu_name LIKE ?)
+              AND (? IS NULL OR status = ?)
             ORDER BY parent_id ASC, order_num ASC, id ASC
             "#,
         )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
+        .bind(&name_kw)
+        .bind(&name_like)
+        .bind(&status)
+        .bind(&status)
         .fetch_all(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询菜单失败: {err}")))
@@ -165,8 +171,8 @@ impl SysMenuRepository {
 
 #[async_trait]
 impl ISysMenuRepository for SysMenuRepository {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysMenuModel>, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysMenuListQueryDto) -> Result<Vec<SysMenuModel>, AppError> {
+        self.list(query).await
     }
 
     async fn get_by_id(&self, id: u64) -> Result<Option<SysMenuModel>, AppError> {

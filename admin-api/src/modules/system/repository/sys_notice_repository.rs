@@ -1,13 +1,14 @@
 use crate::core::dbal::query::fragments;
+use crate::core::dto::sys_notice_dto::{SysNoticeListQueryDto, SysNoticeUpdateReqDto};
 use async_trait::async_trait;
 use shaku::{Component, Interface};
-use sqlx::{MySqlPool, Row};
+use sqlx::{MySql, MySqlPool, QueryBuilder, Row};
 
 use crate::core::{errors::AppError, model::system::SysNoticePo};
 
 #[async_trait]
 pub trait ISysNoticeRepository: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysNoticePo>, AppError>;
+    async fn list(&self, query: SysNoticeListQueryDto) -> Result<Vec<SysNoticePo>, AppError>;
     async fn get_by_id(&self, id: u64) -> Result<Option<SysNoticePo>, AppError>;
     async fn insert(
         &self,
@@ -16,14 +17,7 @@ pub trait ISysNoticeRepository: Interface {
         status: i16,
         publisher: Option<&str>,
     ) -> Result<u64, AppError>;
-    async fn update_by_id(
-        &self,
-        id: u64,
-        title: &str,
-        notice_type: i16,
-        status: i16,
-        publisher: Option<&str>,
-    ) -> Result<bool, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysNoticeUpdateReqDto) -> Result<bool, AppError>;
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
 }
 
@@ -34,21 +28,32 @@ pub(crate) struct SysNoticeRepository {
 }
 
 impl SysNoticeRepository {
-    pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysNoticePo>, AppError> {
-        let (kw, like) = fragments::keyword_args(keyword);
+    pub(crate) async fn list(
+        &self,
+        query: SysNoticeListQueryDto,
+    ) -> Result<Vec<SysNoticePo>, AppError> {
+        let (title_kw, title_like) = fragments::keyword_args(query.title.as_deref());
+        let notice_type = query.notice_type.filter(|s| !s.trim().is_empty());
+        let status = query.status.filter(|s| !s.trim().is_empty());
+
         let rows = sqlx::query(
             r#"
             SELECT n.id, n.title, n.notice_type, n.status, IFNULL(u.username, '') AS publisher
             FROM sys_notice n
             LEFT JOIN sys_user u ON n.published_by = u.id
             WHERE n.is_deleted = 0
-              AND (? = '' OR n.title LIKE ? OR IFNULL(u.username, '') LIKE ?)
+              AND (? = '' OR n.title LIKE ?)
+              AND (? IS NULL OR n.notice_type = ?)
+              AND (? IS NULL OR n.status = ?)
             ORDER BY n.id DESC
             "#,
         )
-        .bind(kw)
-        .bind(&like)
-        .bind(&like)
+        .bind(&title_kw)
+        .bind(&title_like)
+        .bind(&notice_type)
+        .bind(&notice_type)
+        .bind(&status)
+        .bind(&status)
         .fetch_all(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询公告失败: {err}")))?;
@@ -122,32 +127,58 @@ impl SysNoticeRepository {
     pub(crate) async fn update_by_id(
         &self,
         id: u64,
-        title: &str,
-        notice_type: i16,
-        status: i16,
-        publisher: Option<&str>,
+        dto: SysNoticeUpdateReqDto,
     ) -> Result<bool, AppError> {
-        let publisher_id = self.resolve_user_id_by_username(publisher).await?;
-        let content = format!("{title}\n（由系统管理页更新）");
+        let mut builder = QueryBuilder::<MySql>::new("UPDATE sys_notice SET ");
+        let mut separated = builder.separated(", ");
+        let mut has_update = false;
 
-        let result = sqlx::query(
-            r#"
-            UPDATE sys_notice
-            SET title = ?, notice_type = ?, content = ?, status = ?, published_by = ?,
-                published_at = IF(? = 1, NOW(3), NULL), updated_by = 1
-            WHERE id = ? AND is_deleted = 0
-            "#,
-        )
-        .bind(title)
-        .bind(notice_type)
-        .bind(content)
-        .bind(status)
-        .bind(publisher_id)
-        .bind(status)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("更新公告失败: {err}")))?;
+        if let Some(title) = dto.title {
+            let content = format!("{title}\n（由系统管理页更新）");
+            separated.push("title = ").push_bind(title);
+            separated.push("content = ").push_bind(content);
+            has_update = true;
+        }
+
+        if let Some(notice_type_raw) = dto.notice_type {
+            let notice_type = parse_notice_type(Some(notice_type_raw.as_str()))?;
+            separated.push("notice_type = ").push_bind(notice_type);
+            has_update = true;
+        }
+
+        if let Some(status_raw) = dto.status {
+            let status = parse_notice_status(Some(status_raw.as_str()))?;
+            separated.push("status = ").push_bind(status);
+            separated
+                .push("published_at = IF(")
+                .push_bind(status)
+                .push(" = 1, NOW(3), NULL)");
+            has_update = true;
+        }
+
+        if let Some(publisher) = dto.publisher {
+            let publisher_id = self
+                .resolve_user_id_by_username(Some(publisher.as_str()))
+                .await?;
+            separated.push("published_by = ").push_bind(publisher_id);
+            has_update = true;
+        }
+
+        if !has_update {
+            return Err(AppError::bad_request("没有可更新的字段"));
+        }
+
+        separated.push("updated_by = 1");
+        builder
+            .push(" WHERE id = ")
+            .push_bind(id)
+            .push(" AND is_deleted = 0");
+
+        let result = builder
+            .build()
+            .execute(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("更新公告失败: {err}")))?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -192,8 +223,8 @@ impl SysNoticeRepository {
 
 #[async_trait]
 impl ISysNoticeRepository for SysNoticeRepository {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysNoticePo>, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysNoticeListQueryDto) -> Result<Vec<SysNoticePo>, AppError> {
+        self.list(query).await
     }
 
     async fn get_by_id(&self, id: u64) -> Result<Option<SysNoticePo>, AppError> {
@@ -210,19 +241,40 @@ impl ISysNoticeRepository for SysNoticeRepository {
         self.insert(title, notice_type, status, publisher).await
     }
 
-    async fn update_by_id(
-        &self,
-        id: u64,
-        title: &str,
-        notice_type: i16,
-        status: i16,
-        publisher: Option<&str>,
-    ) -> Result<bool, AppError> {
-        self.update_by_id(id, title, notice_type, status, publisher)
-            .await
+    async fn update_by_id(&self, id: u64, dto: SysNoticeUpdateReqDto) -> Result<bool, AppError> {
+        self.update_by_id(id, dto).await
     }
 
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
         self.delete_by_id(id).await
+    }
+}
+
+fn parse_notice_type(raw: Option<&str>) -> Result<i16, AppError> {
+    let value = raw
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::bad_request("公告类型不能为空"))?;
+
+    match value {
+        "通知" | "1" => Ok(1),
+        "公告" | "2" => Ok(2),
+        _ => Err(AppError::bad_request("公告类型非法，仅支持 通知/公告/1/2")),
+    }
+}
+
+fn parse_notice_status(raw: Option<&str>) -> Result<i16, AppError> {
+    let value = raw
+        .map(str::trim)
+        .filter(|v| !v.is_empty())
+        .ok_or_else(|| AppError::bad_request("公告状态不能为空"))?;
+
+    match value {
+        "draft" | "0" => Ok(0),
+        "published" | "1" => Ok(1),
+        "offline" | "2" => Ok(2),
+        _ => Err(AppError::bad_request(
+            "公告状态非法，仅支持 draft/published/offline/0/1/2",
+        )),
     }
 }

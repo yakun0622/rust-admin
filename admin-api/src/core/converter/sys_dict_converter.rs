@@ -1,7 +1,5 @@
 use crate::core::{
-    dto::sys_dict_dto::{SysDictCreateReqDto, SysDictUpdateReqDto},
-    errors::AppError,
-    model::sys_dict::SysDictModel,
+    dto::sys_dict_dto::SysDictCreateReqDto, errors::AppError, model::sys_dict::SysDictModel,
     vo::sys_dict_vo::SysDictVo,
 };
 
@@ -22,16 +20,6 @@ pub fn to_sys_dict_vo(model: SysDictModel) -> SysDictVo {
 pub fn from_create_dto(dto: SysDictCreateReqDto) -> Result<SysDictModel, AppError> {
     Ok(SysDictModel {
         id: 0,
-        dict_type: normalize_required_text("字典类型", dto.dict_type)?,
-        label: normalize_required_text("字典标签", dto.label)?,
-        value: normalize_required_text("字典值", dto.value)?,
-        status: normalize_status(dto.status.as_deref())?,
-    })
-}
-
-pub fn from_update_dto(id: u64, dto: SysDictUpdateReqDto) -> Result<SysDictModel, AppError> {
-    Ok(SysDictModel {
-        id,
         dict_type: normalize_required_text("字典类型", dto.dict_type)?,
         label: normalize_required_text("字典标签", dto.label)?,
         value: normalize_required_text("字典值", dto.value)?,

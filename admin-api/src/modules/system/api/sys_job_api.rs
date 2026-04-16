@@ -13,7 +13,6 @@ use crate::{
         response::ApiResponse,
         vo::monitor_vo::{JobActionVo, JobItemVo, JobListVo, JobLogListVo},
     },
-    middleware::auth::ensure_permission,
 };
 
 pub struct SysJobRouter;
@@ -35,7 +34,7 @@ async fn list_jobs(
     current_user: CurrentUser,
     Query(query): Query<MonitorListQueryDto>,
 ) -> Result<Json<ApiResponse<JobListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:view").await?;
+    crate::permission!(state, current_user, "monitor:job:view");
     let data = state
         .sys_job_service
         .list_jobs(query.keyword.as_deref())
@@ -48,7 +47,7 @@ async fn list_job_logs(
     current_user: CurrentUser,
     Query(query): Query<JobLogQueryDto>,
 ) -> Result<Json<ApiResponse<JobLogListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:view").await?;
+    crate::permission!(state, current_user, "monitor:job:view");
     let data = state.sys_job_service.list_job_logs(query).await?;
     Ok(Json(ApiResponse::success(data)))
 }
@@ -58,8 +57,11 @@ async fn create_job(
     current_user: CurrentUser,
     Json(payload): Json<JobUpsertReqDto>,
 ) -> Result<Json<ApiResponse<JobItemVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:create").await?;
-    let data = state.sys_job_service.create_job(payload).await?;
+    crate::permission!(state, current_user, "monitor:job:create");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "创建定时任务", 1_i8, async move {
+        service.create_job(payload).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -69,8 +71,11 @@ async fn update_job(
     Path(id): Path<u64>,
     Json(payload): Json<JobUpsertReqDto>,
 ) -> Result<Json<ApiResponse<JobItemVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:update").await?;
-    let data = state.sys_job_service.update_job(id, payload).await?;
+    crate::permission!(state, current_user, "monitor:job:update");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "修改定时任务", 2_i8, async move {
+        service.update_job(id, payload).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -79,8 +84,11 @@ async fn delete_job(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<JobActionVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:delete").await?;
-    let data = state.sys_job_service.delete_job(id).await?;
+    crate::permission!(state, current_user, "monitor:job:delete");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "删除定时任务", 3_i8, async move {
+        service.delete_job(id).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -89,8 +97,11 @@ async fn run_job(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<JobActionVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:run").await?;
-    let data = state.sys_job_service.run_job_once(id).await?;
+    crate::permission!(state, current_user, "monitor:job:run");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "执行定时任务", 4_i8, async move {
+        service.run_job_once(id).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -99,8 +110,11 @@ async fn pause_job(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<JobActionVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:pause").await?;
-    let data = state.sys_job_service.pause_job(id).await?;
+    crate::permission!(state, current_user, "monitor:job:pause");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "暂停定时任务", 4_i8, async move {
+        service.pause_job(id).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -109,7 +123,10 @@ async fn resume_job(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<JobActionVo>>, AppError> {
-    ensure_permission(&state, &current_user, "monitor:job:resume").await?;
-    let data = state.sys_job_service.resume_job(id).await?;
+    crate::permission!(state, current_user, "monitor:job:resume");
+    let service = state.sys_job_service.clone();
+    let data = crate::admin_log!(state, current_user, "恢复定时任务", 4_i8, async move {
+        service.resume_job(id).await
+    })?;
     Ok(Json(ApiResponse::success(data)))
 }

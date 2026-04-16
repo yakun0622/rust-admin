@@ -25,6 +25,7 @@ pub trait ISysAuthRepository: Interface {
         status: i8,
         message: &str,
         ip: &str,
+        location: Option<&str>,
     ) -> Result<(), AppError>;
 }
 
@@ -60,16 +61,18 @@ impl SysAuthRepository {
         status: i8,
         message: &str,
         ip: &str,
+        location: Option<&str>,
     ) -> Result<(), AppError> {
         sqlx::query(
             r#"
-            INSERT INTO sys_login_log (username, login_type, ip, status, message)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO sys_login_log (username, login_type, ip, location, status, message)
+            VALUES (?, ?, ?, ?, ?, ?)
             "#,
         )
         .bind(username.unwrap_or_default())
         .bind(login_type)
         .bind(ip)
+        .bind(location)
         .bind(status)
         .bind(message)
         .execute(&self.pool)
@@ -199,8 +202,9 @@ impl ISysAuthRepository for SysAuthRepository {
         status: i8,
         message: &str,
         ip: &str,
+        location: Option<&str>,
     ) -> Result<(), AppError> {
-        self.append_login_log(username, login_type, status, message, ip)
+        self.append_login_log(username, login_type, status, message, ip, location)
             .await
     }
 }

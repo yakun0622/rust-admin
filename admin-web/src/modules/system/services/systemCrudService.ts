@@ -24,23 +24,28 @@ function normalizeRecord(raw: Record<string, unknown>): SystemCrudRecord {
 }
 
 function unwrapResponse<T>(response: ApiResponse<T>, fallbackMessage: string): T {
-  if (response.code !== 200 || !response.data) {
+  if (response.code !== 200) {
     throw new Error(response.message || fallbackMessage);
   }
-  return response.data;
+  return response.data as T;
 }
 
 export async function listSystemRecords(
   resource: string,
-  keyword?: string
+  params?: Record<string, unknown>
 ): Promise<{ total: number; items: SystemCrudRecord[] }> {
-  const params: Record<string, string> = {};
-  const trimmed = keyword?.trim();
-  if (trimmed) {
-    params.keyword = trimmed;
+  const queryParams: Record<string, unknown> = {};
+  if (params) {
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== "") {
+        queryParams[key] = value;
+      }
+    });
   }
 
-  const res = await http.get<ApiResponse<SystemCrudListVo>>(`/system/${resource}`, { params });
+  const res = await http.get<ApiResponse<SystemCrudListVo>>(`/system/${resource}`, {
+    params: queryParams
+  });
   const data = unwrapResponse(res.data, "查询列表失败");
   return {
     total: data.total,
@@ -72,4 +77,14 @@ export async function deleteSystemRecord(resource: string, id: number): Promise<
     `/system/${resource}/${id}`
   );
   unwrapResponse(res.data, "删除失败");
+}
+
+export async function listRoleMenuIds(id: number): Promise<number[]> {
+  const res = await http.get<ApiResponse<number[]>>(`/system/role/${id}/menu_ids`);
+  return unwrapResponse(res.data, "查询权限失败");
+}
+
+export async function updateRoleMenuIds(id: number, menuIds: number[]): Promise<void> {
+  const res = await http.put<ApiResponse<void>>(`/system/role/${id}/menu_ids`, menuIds);
+  unwrapResponse(res.data, "分配权限失败");
 }

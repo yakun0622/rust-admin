@@ -19,6 +19,7 @@ use crate::{
         dto::auth_dto::LoginReqDto,
         errors::AppError,
         model::auth::UserCredentialPo,
+        utils::ip_util,
         vo::{
             auth_vo::{AuthProfileVo, LoginVo},
             sys_menu_vo::SysMenuVo,
@@ -159,9 +160,23 @@ impl SysAuthService {
         message: &str,
         ip: &str,
     ) {
+        let mut location = None;
+        if !ip.is_empty() && ip != "127.0.0.1" && ip != "::1" {
+            if let Some(info) = ip_util::get_ip_location(ip).await {
+                location = Some(ip_util::format_location(&info));
+            }
+        }
+
         let _ = self
             .repo
-            .append_login_log(username, login_type, status, message, ip)
+            .append_login_log(
+                username,
+                login_type,
+                status,
+                message,
+                ip,
+                location.as_deref(),
+            )
             .await;
     }
 

@@ -6,7 +6,7 @@ use shaku::{Component, Interface};
 
 use crate::core::{
     converter::sys_menu_converter::{from_create_dto, from_update_dto, to_sys_menu_vo},
-    dto::sys_menu_dto::{SysMenuCreateReqDto, SysMenuUpdateReqDto},
+    dto::sys_menu_dto::{SysMenuCreateReqDto, SysMenuListQueryDto, SysMenuUpdateReqDto},
     errors::AppError,
     model::sys_menu::SysMenuModel,
     vo::sys_menu_vo::{SysMenuListVo, SysMenuVo},
@@ -15,8 +15,8 @@ use crate::modules::system::repository::ISysMenuRepository;
 
 #[async_trait]
 pub trait ISysMenuService: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError>;
-    async fn list_tree(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError>;
+    async fn list(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError>;
+    async fn list_tree(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError>;
     async fn create(&self, dto: SysMenuCreateReqDto) -> Result<SysMenuVo, AppError>;
     async fn update_by_id(&self, id: u64, dto: SysMenuUpdateReqDto) -> Result<SysMenuVo, AppError>;
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
@@ -30,10 +30,10 @@ pub struct SysMenuService {
 }
 
 impl SysMenuService {
-    pub async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
+    pub async fn list(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError> {
         let items = self
             .repo
-            .list(keyword.and_then(normalize_optional_str))
+            .list(query)
             .await?
             .into_iter()
             .map(to_sys_menu_vo)
@@ -45,10 +45,10 @@ impl SysMenuService {
         })
     }
 
-    pub async fn list_tree(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
+    pub async fn list_tree(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError> {
         let flat_items = self
             .repo
-            .list(keyword.and_then(normalize_optional_str))
+            .list(query)
             .await?
             .into_iter()
             .map(to_sys_menu_vo)
@@ -121,12 +121,12 @@ impl SysMenuService {
 
 #[async_trait]
 impl ISysMenuService for SysMenuService {
-    async fn list(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError> {
+        self.list(query).await
     }
 
-    async fn list_tree(&self, keyword: Option<&str>) -> Result<SysMenuListVo, AppError> {
-        self.list_tree(keyword).await
+    async fn list_tree(&self, query: SysMenuListQueryDto) -> Result<SysMenuListVo, AppError> {
+        self.list_tree(query).await
     }
 
     async fn create(&self, dto: SysMenuCreateReqDto) -> Result<SysMenuVo, AppError> {
@@ -139,15 +139,6 @@ impl ISysMenuService for SysMenuService {
 
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {
         self.delete_by_id(id).await
-    }
-}
-
-fn normalize_optional_str(value: &str) -> Option<&str> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        None
-    } else {
-        Some(trimmed)
     }
 }
 

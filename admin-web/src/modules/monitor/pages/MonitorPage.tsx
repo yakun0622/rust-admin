@@ -17,7 +17,6 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import { useEffect, useState } from "react";
-import { PageHeader } from "../../../shared/components/PageHeader";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import {
   createJob,
@@ -308,7 +307,6 @@ export function MonitorPage({ title, kind }: MonitorPageProps) {
   return (
     <div className="biz-page">
       {contextHolder}
-      <PageHeader title={title} description="监控模块已接入真实后端接口（MVP）。" />
       {error ? (
         <Alert
           type="error"

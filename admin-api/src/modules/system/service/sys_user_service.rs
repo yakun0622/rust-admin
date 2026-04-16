@@ -4,8 +4,8 @@ use async_trait::async_trait;
 use shaku::{Component, Interface};
 
 use crate::core::{
-    converter::sys_user_converter::{from_create_dto, from_update_dto, to_sys_user_vo},
-    dto::sys_user_dto::{SysUserCreateReqDto, SysUserUpdateReqDto},
+    converter::sys_user_converter::{from_create_dto, to_sys_user_vo},
+    dto::sys_user_dto::{SysUserCreateReqDto, SysUserListQueryDto, SysUserUpdateReqDto},
     errors::AppError,
     vo::sys_user_vo::SysUserVo,
 };
@@ -13,7 +13,7 @@ use crate::modules::system::repository::{ISysUserRepository, DEFAULT_PASSWORD_HA
 
 #[async_trait]
 pub trait ISysUserService: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError>;
+    async fn list(&self, query: SysUserListQueryDto) -> Result<Vec<SysUserVo>, AppError>;
     async fn create(&self, dto: SysUserCreateReqDto) -> Result<SysUserVo, AppError>;
     async fn update_by_id(&self, id: u64, dto: SysUserUpdateReqDto) -> Result<SysUserVo, AppError>;
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
@@ -27,9 +27,8 @@ pub struct SysUserService {
 }
 
 impl SysUserService {
-    pub async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError> {
-        let normalized_keyword = keyword.and_then(normalize_optional_str);
-        let users = self.repo.list(normalized_keyword.as_deref()).await?;
+    pub async fn list(&self, query: SysUserListQueryDto) -> Result<Vec<SysUserVo>, AppError> {
+        let users = self.repo.list(query).await?;
         Ok(users.into_iter().map(to_sys_user_vo).collect())
     }
 
@@ -50,9 +49,7 @@ impl SysUserService {
         dto: SysUserUpdateReqDto,
     ) -> Result<SysUserVo, AppError> {
         let normalized = normalize_update_dto(dto)?;
-
-        let model = from_update_dto(id, normalized, DEFAULT_PASSWORD_HASH);
-        let affected = self.repo.update_by_id(id, &model).await?;
+        let affected = self.repo.update_by_id(id, normalized).await?;
         if !affected {
             return Err(AppError::not_found(format!(
                 "user 资源中不存在 id={id} 的记录"
@@ -80,8 +77,8 @@ impl SysUserService {
 
 #[async_trait]
 impl ISysUserService for SysUserService {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysUserVo>, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysUserListQueryDto) -> Result<Vec<SysUserVo>, AppError> {
+        self.list(query).await
     }
 
     async fn create(&self, dto: SysUserCreateReqDto) -> Result<SysUserVo, AppError> {
@@ -106,10 +103,21 @@ fn normalize_create_dto(mut dto: SysUserCreateReqDto) -> Result<SysUserCreateReq
 }
 
 fn normalize_update_dto(mut dto: SysUserUpdateReqDto) -> Result<SysUserUpdateReqDto, AppError> {
-    dto.username = normalize_required_text("用户名", dto.username)?;
-    dto.nickname = normalize_required_text("昵称", dto.nickname)?;
-    dto.phone = normalize_optional_text(dto.phone.as_deref()).map(ToString::to_string);
-    dto.status = Some(normalize_status(dto.status.as_deref())?.to_string());
+    dto.username = match dto.username {
+        Some(username) => Some(normalize_required_text("用户名", username)?),
+        None => None,
+    };
+    dto.nickname = match dto.nickname {
+        Some(nickname) => Some(normalize_required_text("昵称", nickname)?),
+        None => None,
+    };
+    dto.phone = dto
+        .phone
+        .and_then(|phone| normalize_optional_str(phone.as_str()).map(ToString::to_string));
+    dto.status = match dto.status {
+        Some(status) => Some(normalize_status(Some(status.as_str()))?.to_string()),
+        None => None,
+    };
     Ok(dto)
 }
 

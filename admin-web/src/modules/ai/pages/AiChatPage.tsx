@@ -1,7 +1,6 @@
 import { PlusOutlined } from "@ant-design/icons";
 import { Alert, Button, Card, Empty, Input, List, Space, Spin, Typography, message } from "antd";
 import { useEffect, useState } from "react";
-import { PageHeader } from "../../../shared/components/PageHeader";
 import { useDocumentTitle } from "../../../shared/hooks/useDocumentTitle";
 import {
   createAiSession,
@@ -113,7 +112,6 @@ export function AiChatPage() {
   return (
     <div className="biz-page">
       {contextHolder}
-      <PageHeader title="AI 对话" description="当前接入后端 Mock 对话接口，暂未连接真实模型。" />
       {error ? (
         <Alert
           type="error"

@@ -1,11 +1,14 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct SysUserListQueryDto {
-    pub keyword: Option<String>,
+    pub username: Option<String>,
+    pub nickname: Option<String>,
+    pub phone: Option<String>,
+    pub status: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysUserCreateReqDto {
     pub username: String,
     pub nickname: String,
@@ -13,10 +16,10 @@ pub struct SysUserCreateReqDto {
     pub status: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct SysUserUpdateReqDto {
-    pub username: String,
-    pub nickname: String,
+    pub username: Option<String>,
+    pub nickname: Option<String>,
     pub phone: Option<String>,
     pub status: Option<String>,
 }

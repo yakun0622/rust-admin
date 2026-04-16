@@ -1,11 +1,11 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct MonitorListQueryDto {
     pub keyword: Option<String>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct JobLogQueryDto {
     pub keyword: Option<String>,
     pub job_id: Option<u64>,
@@ -13,13 +13,13 @@ pub struct JobLogQueryDto {
     pub limit: Option<usize>,
 }
 
-#[derive(Debug, Clone, Deserialize, Default)]
+#[derive(Debug, Clone, Deserialize, Serialize, Default)]
 pub struct CacheSearchQueryDto {
     pub keyword: Option<String>,
     pub limit: Option<usize>,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct JobUpsertReqDto {
     pub job_name: String,
     pub job_group: String,

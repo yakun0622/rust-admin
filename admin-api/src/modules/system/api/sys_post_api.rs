@@ -13,7 +13,6 @@ use crate::{
         response::ApiResponse,
         vo::sys_post_vo::{SysPostDeleteVo, SysPostListVo, SysPostRecordVo},
     },
-    middleware::auth::ensure_permission,
 };
 
 pub struct SysPostRouter;
@@ -31,9 +30,9 @@ async fn list(
     current_user: CurrentUser,
     Query(query): Query<SysPostListQueryDto>,
 ) -> Result<Json<ApiResponse<SysPostListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:post:view").await?;
+    crate::permission!(state, current_user, "system:post:view");
     let service = state.post_service();
-    let data = service.list(query.keyword.as_deref()).await?;
+    let data = service.list(query).await?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -42,9 +41,11 @@ async fn create(
     current_user: CurrentUser,
     Json(payload): Json<SysPostCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysPostRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:post:create").await?;
+    crate::permission!(state, current_user, "system:post:create");
     let service = state.post_service();
-    let item = service.create(payload).await?;
+    let item = crate::admin_log!(state, current_user, "创建岗位", 1_i8, async move {
+        service.create(payload).await
+    })?;
     Ok(Json(ApiResponse::success(SysPostRecordVo { item })))
 }
 
@@ -54,9 +55,11 @@ async fn update(
     Path(id): Path<u64>,
     Json(payload): Json<SysPostUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysPostRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:post:update").await?;
+    crate::permission!(state, current_user, "system:post:update");
     let service = state.post_service();
-    let item = service.update_by_id(id, payload).await?;
+    let item = crate::admin_log!(state, current_user, "修改岗位", 2_i8, async move {
+        service.update_by_id(id, payload).await
+    })?;
     Ok(Json(ApiResponse::success(SysPostRecordVo { item })))
 }
 
@@ -65,8 +68,10 @@ async fn remove(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysPostDeleteVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:post:delete").await?;
+    crate::permission!(state, current_user, "system:post:delete");
     let service = state.post_service();
-    let deleted = service.delete_by_id(id).await?;
+    let deleted = crate::admin_log!(state, current_user, "删除岗位", 3_i8, async move {
+        service.delete_by_id(id).await
+    })?;
     Ok(Json(ApiResponse::success(SysPostDeleteVo { id, deleted })))
 }

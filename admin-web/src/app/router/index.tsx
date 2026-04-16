@@ -9,6 +9,8 @@ import { logRoutes } from "../../modules/log/routes";
 import { monitorRoutes } from "../../modules/monitor/routes";
 import { systemRoutes } from "../../modules/system/routes";
 
+import { TabsProvider } from "../providers/TabsProvider";
+
 function RequireAuth({ children }: { children: ReactNode }) {
   const token = getAccessToken();
   if (!token) {
@@ -23,7 +25,9 @@ const routes: RouteObject[] = [
     path: "/",
     element: (
       <RequireAuth>
-        <AdminLayout />
+        <TabsProvider>
+          <AdminLayout />
+        </TabsProvider>
       </RequireAuth>
     ),
     children: [

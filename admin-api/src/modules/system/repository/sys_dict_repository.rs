@@ -1,16 +1,17 @@
 use crate::core::dbal::query::fragments;
+use crate::core::dto::sys_dict_dto::{SysDictListQueryDto, SysDictUpdateReqDto};
 use async_trait::async_trait;
 use shaku::{Component, Interface};
-use sqlx::MySqlPool;
+use sqlx::{MySql, MySqlPool, QueryBuilder};
 
 use crate::core::{errors::AppError, model::sys_dict::SysDictModel};
 
 #[async_trait]
 pub trait ISysDictRepository: Interface {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDictModel>, AppError>;
+    async fn list(&self, query: SysDictListQueryDto) -> Result<Vec<SysDictModel>, AppError>;
     async fn get_by_id(&self, id: u64) -> Result<Option<SysDictModel>, AppError>;
     async fn insert(&self, model: &SysDictModel) -> Result<u64, AppError>;
-    async fn update_by_id(&self, id: u64, model: &SysDictModel) -> Result<bool, AppError>;
+    async fn update_by_id(&self, id: u64, dto: SysDictUpdateReqDto) -> Result<bool, AppError>;
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError>;
 }
 
@@ -21,8 +22,14 @@ pub(crate) struct SysDictRepository {
 }
 
 impl SysDictRepository {
-    pub(crate) async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDictModel>, AppError> {
-        let (kw, like) = fragments::keyword_args(keyword);
+    pub(crate) async fn list(
+        &self,
+        query: SysDictListQueryDto,
+    ) -> Result<Vec<SysDictModel>, AppError> {
+        let (type_kw, type_like) = fragments::keyword_args(query.dict_type.as_deref());
+        let (label_kw, label_like) = fragments::keyword_args(query.dict_label.as_deref());
+        let status = query.status.filter(|s| !s.trim().is_empty());
+
         sqlx::query_as::<_, SysDictModel>(
             r#"
             SELECT d.id, t.dict_type, d.label, d.value, d.status
@@ -30,14 +37,18 @@ impl SysDictRepository {
             INNER JOIN sys_dict_type t ON d.dict_type_id = t.id
             WHERE d.is_deleted = 0
               AND t.is_deleted = 0
-              AND (? = '' OR t.dict_type LIKE ? OR d.label LIKE ? OR d.value LIKE ?)
+              AND (? = '' OR t.dict_type LIKE ?)
+              AND (? = '' OR d.label LIKE ?)
+              AND (? IS NULL OR d.status = ?)
             ORDER BY d.id DESC
             "#,
         )
-        .bind(&kw)
-        .bind(&like)
-        .bind(&like)
-        .bind(&like)
+        .bind(&type_kw)
+        .bind(&type_like)
+        .bind(&label_kw)
+        .bind(&label_like)
+        .bind(&status)
+        .bind(&status)
         .fetch_all(&self.pool)
         .await
         .map_err(|err| AppError::internal(format!("查询字典失败: {err}")))
@@ -82,24 +93,50 @@ impl SysDictRepository {
     pub(crate) async fn update_by_id(
         &self,
         id: u64,
-        model: &SysDictModel,
+        dto: SysDictUpdateReqDto,
     ) -> Result<bool, AppError> {
-        let dict_type_id = self.ensure_dict_type_id(&model.dict_type).await?;
-        let result = sqlx::query(
-            r#"
-            UPDATE sys_dict_data
-            SET dict_type_id = ?, label = ?, value = ?, status = ?, updated_by = 1
-            WHERE id = ? AND is_deleted = 0
-            "#,
-        )
-        .bind(dict_type_id)
-        .bind(&model.label)
-        .bind(&model.value)
-        .bind(model.status)
-        .bind(id)
-        .execute(&self.pool)
-        .await
-        .map_err(|err| AppError::internal(format!("更新字典失败: {err}")))?;
+        let mut builder = QueryBuilder::<MySql>::new("UPDATE sys_dict_data SET ");
+        let mut separated = builder.separated(", ");
+        let mut has_update = false;
+
+        if let Some(dict_type) = dto.dict_type {
+            let dict_type_id = self.ensure_dict_type_id(&dict_type).await?;
+            separated.push("dict_type_id = ").push_bind(dict_type_id);
+            has_update = true;
+        }
+        if let Some(label) = dto.label {
+            separated.push("label = ").push_bind(label);
+            has_update = true;
+        }
+        if let Some(value) = dto.value {
+            separated.push("value = ").push_bind(value);
+            has_update = true;
+        }
+        if let Some(status) = dto.status {
+            let status_value = if matches!(status.as_str(), "disabled" | "0") {
+                0_i16
+            } else {
+                1_i16
+            };
+            separated.push("status = ").push_bind(status_value);
+            has_update = true;
+        }
+
+        if !has_update {
+            return Err(AppError::bad_request("没有可更新的字段"));
+        }
+
+        separated.push("updated_by = 1");
+        builder
+            .push(" WHERE id = ")
+            .push_bind(id)
+            .push(" AND is_deleted = 0");
+
+        let result = builder
+            .build()
+            .execute(&self.pool)
+            .await
+            .map_err(|err| AppError::internal(format!("更新字典失败: {err}")))?;
         Ok(result.rows_affected() > 0)
     }
 
@@ -153,8 +190,8 @@ impl SysDictRepository {
 
 #[async_trait]
 impl ISysDictRepository for SysDictRepository {
-    async fn list(&self, keyword: Option<&str>) -> Result<Vec<SysDictModel>, AppError> {
-        self.list(keyword).await
+    async fn list(&self, query: SysDictListQueryDto) -> Result<Vec<SysDictModel>, AppError> {
+        self.list(query).await
     }
 
     async fn get_by_id(&self, id: u64) -> Result<Option<SysDictModel>, AppError> {
@@ -165,8 +202,8 @@ impl ISysDictRepository for SysDictRepository {
         self.insert(model).await
     }
 
-    async fn update_by_id(&self, id: u64, model: &SysDictModel) -> Result<bool, AppError> {
-        self.update_by_id(id, model).await
+    async fn update_by_id(&self, id: u64, dto: SysDictUpdateReqDto) -> Result<bool, AppError> {
+        self.update_by_id(id, dto).await
     }
 
     async fn delete_by_id(&self, id: u64) -> Result<bool, AppError> {

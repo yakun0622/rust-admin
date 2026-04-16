@@ -8,12 +8,13 @@ use crate::{
     app::state::AppState,
     core::{
         common::CurrentUser,
-        dto::system_dto::{SysNoticeCreateReqDto, SysNoticeUpdateReqDto, SystemListQueryDto},
+        dto::sys_notice_dto::{
+            SysNoticeCreateReqDto, SysNoticeListQueryDto, SysNoticeUpdateReqDto,
+        },
         errors::AppError,
         response::ApiResponse,
         vo::system_vo::{SystemCrudDeleteVo, SystemCrudListVo, SystemCrudRecordVo},
     },
-    middleware::auth::ensure_permission,
 };
 
 pub struct SysNoticeRouter;
@@ -29,11 +30,11 @@ impl SysNoticeRouter {
 async fn list(
     State(state): State<AppState>,
     current_user: CurrentUser,
-    Query(query): Query<SystemListQueryDto>,
+    Query(query): Query<SysNoticeListQueryDto>,
 ) -> Result<Json<ApiResponse<SystemCrudListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:notice:view").await?;
+    crate::permission!(state, current_user, "system:notice:view");
     let service = state.notice_service();
-    let data = service.list(query.keyword.as_deref()).await?;
+    let data = service.list(query).await?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -42,9 +43,11 @@ async fn create(
     current_user: CurrentUser,
     Json(payload): Json<SysNoticeCreateReqDto>,
 ) -> Result<Json<ApiResponse<SystemCrudRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:notice:create").await?;
+    crate::permission!(state, current_user, "system:notice:create");
     let service = state.notice_service();
-    let item = service.create(payload).await?;
+    let item = crate::admin_log!(state, current_user, "创建公告", 1_i8, async move {
+        service.create(payload).await
+    })?;
     Ok(Json(ApiResponse::success(SystemCrudRecordVo { item })))
 }
 
@@ -54,9 +57,11 @@ async fn update(
     Path(id): Path<u64>,
     Json(payload): Json<SysNoticeUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SystemCrudRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:notice:update").await?;
+    crate::permission!(state, current_user, "system:notice:update");
     let service = state.notice_service();
-    let item = service.update_by_id(id, payload).await?;
+    let item = crate::admin_log!(state, current_user, "修改公告", 2_i8, async move {
+        service.update_by_id(id, payload).await
+    })?;
     Ok(Json(ApiResponse::success(SystemCrudRecordVo { item })))
 }
 
@@ -65,9 +70,11 @@ async fn remove(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SystemCrudDeleteVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:notice:delete").await?;
+    crate::permission!(state, current_user, "system:notice:delete");
     let service = state.notice_service();
-    let deleted = service.delete_by_id(id).await?;
+    let deleted = crate::admin_log!(state, current_user, "删除公告", 3_i8, async move {
+        service.delete_by_id(id).await
+    })?;
     Ok(Json(ApiResponse::success(SystemCrudDeleteVo {
         id,
         deleted,

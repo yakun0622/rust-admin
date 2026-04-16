@@ -13,7 +13,6 @@ use crate::{
         response::ApiResponse,
         vo::sys_menu_vo::{SysMenuDeleteVo, SysMenuListVo, SysMenuRecordVo},
     },
-    middleware::auth::ensure_permission,
 };
 
 pub struct SysMenuRouter;
@@ -32,9 +31,9 @@ async fn list(
     current_user: CurrentUser,
     Query(query): Query<SysMenuListQueryDto>,
 ) -> Result<Json<ApiResponse<SysMenuListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:menu:view").await?;
+    crate::permission!(state, current_user, "system:menu:view");
     let service = state.menu_service();
-    let data = service.list(query.keyword.as_deref()).await?;
+    let data = service.list(query).await?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -43,9 +42,11 @@ async fn create(
     current_user: CurrentUser,
     Json(payload): Json<SysMenuCreateReqDto>,
 ) -> Result<Json<ApiResponse<SysMenuRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:menu:create").await?;
+    crate::permission!(state, current_user, "system:menu:create");
     let service = state.menu_service();
-    let item = service.create(payload).await?;
+    let item = crate::admin_log!(state, current_user, "创建菜单", 1_i8, async move {
+        service.create(payload).await
+    })?;
     Ok(Json(ApiResponse::success(SysMenuRecordVo { item })))
 }
 
@@ -54,9 +55,9 @@ async fn list_tree(
     current_user: CurrentUser,
     Query(query): Query<SysMenuListQueryDto>,
 ) -> Result<Json<ApiResponse<SysMenuListVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:menu:view").await?;
+    crate::permission!(state, current_user, "system:menu:view");
     let service = state.menu_service();
-    let data = service.list_tree(query.keyword.as_deref()).await?;
+    let data = service.list_tree(query).await?;
     Ok(Json(ApiResponse::success(data)))
 }
 
@@ -66,9 +67,11 @@ async fn update(
     Path(id): Path<u64>,
     Json(payload): Json<SysMenuUpdateReqDto>,
 ) -> Result<Json<ApiResponse<SysMenuRecordVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:menu:update").await?;
+    crate::permission!(state, current_user, "system:menu:update");
     let service = state.menu_service();
-    let item = service.update_by_id(id, payload).await?;
+    let item = crate::admin_log!(state, current_user, "修改菜单", 2_i8, async move {
+        service.update_by_id(id, payload).await
+    })?;
     Ok(Json(ApiResponse::success(SysMenuRecordVo { item })))
 }
 
@@ -77,8 +80,10 @@ async fn remove(
     current_user: CurrentUser,
     Path(id): Path<u64>,
 ) -> Result<Json<ApiResponse<SysMenuDeleteVo>>, AppError> {
-    ensure_permission(&state, &current_user, "system:menu:delete").await?;
+    crate::permission!(state, current_user, "system:menu:delete");
     let service = state.menu_service();
-    let deleted = service.delete_by_id(id).await?;
+    let deleted = crate::admin_log!(state, current_user, "删除菜单", 3_i8, async move {
+        service.delete_by_id(id).await
+    })?;
     Ok(Json(ApiResponse::success(SysMenuDeleteVo { id, deleted })))
 }

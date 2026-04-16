@@ -3,9 +3,12 @@ import {
   BgColorsOutlined,
   BellOutlined,
   BookOutlined,
+  CloseCircleOutlined,
+  CloseOutlined,
   CloudServerOutlined,
   DashboardOutlined,
   DatabaseOutlined,
+  EllipsisOutlined,
   FileTextOutlined,
   FundProjectionScreenOutlined,
   HddOutlined,
@@ -23,7 +26,10 @@ import {
   SettingOutlined,
   TeamOutlined,
   ToolOutlined,
-  UserOutlined
+  UserOutlined,
+  ArrowLeftOutlined,
+  ArrowRightOutlined,
+  MinusCircleOutlined
 } from "@ant-design/icons";
 import {
   Avatar,
@@ -35,17 +41,20 @@ import {
   Menu,
   Select,
   Space,
+  Tabs,
   Typography,
   message
 } from "antd";
 import type { MenuProps } from "antd";
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
-import { Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useEffect, useMemo, useState, useRef } from "react";
+import { useLocation, useNavigate, useOutlet } from "react-router-dom";
 import { hasPermission } from "../../core/permission";
 import type { AuthMenuVo } from "../../modules/auth/services/authService";
 import { APP_THEME_OPTIONS, useAppTheme, useAuthSession, type AppThemeMode } from "../providers";
+import { useTabs } from "../providers/TabsProvider";
 import "./AdminLayout.css";
+import "./AdminLayoutTabs.css";
 
 const { Header, Sider, Content } = Layout;
 
@@ -59,6 +68,7 @@ type QuickAction = {
 type MenuPathMeta = {
   path: string;
   title: string;
+  icon?: string;
   parentKeys: string[];
 };
 
@@ -155,6 +165,7 @@ function collectMenuPathMeta(
       result.push({
         path: nodePath,
         title: node.name,
+        icon: node.icon,
         parentKeys
       });
     }
@@ -185,10 +196,15 @@ function resolveMatchedPathMeta(pathname: string, pathMetaList: MenuPathMeta[]):
 export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
+  const outlet = useOutlet();
   const [messageApi, contextHolder] = message.useMessage();
   const { themeMode, setThemeMode } = useAppTheme();
   const { profile, menus, permissions, loading: authLoading, error: authError, logout, hasPerm } = useAuthSession();
+  const { tabs, activeKey, addTab, removeTab, closeOthers, closeAll, closeLeft, closeRight } = useTabs();
+  
   const [openKeys, setOpenKeys] = useState<string[]>([]);
+  // Cache components for keep-alive
+  const [componentCache, setComponentCache] = useState<Record<string, ReactNode>>({});
 
   const menuItems = useMemo(() => buildAntdMenuItems(menus), [menus]);
   const pathMetaList = useMemo(() => collectMenuPathMeta(menus), [menus]);
@@ -196,6 +212,43 @@ export function AdminLayout() {
     () => resolveMatchedPathMeta(location.pathname, pathMetaList),
     [location.pathname, pathMetaList]
   );
+
+  // Sync route outlet to cache
+  useEffect(() => {
+    if (outlet && location.pathname !== "/") {
+      setComponentCache((prev) => ({
+        ...prev,
+        [location.pathname]: outlet
+      }));
+    }
+  }, [location.pathname, outlet]);
+
+  // Sync tabs with navigation
+  useEffect(() => {
+    if (matchedMeta) {
+      addTab({
+        key: matchedMeta.path,
+        label: matchedMeta.title,
+        icon: matchedMeta.icon
+      });
+    }
+  }, [matchedMeta, addTab]);
+
+  // Purge cache for closed tabs
+  useEffect(() => {
+    setComponentCache((prev) => {
+      const keys = Object.keys(prev);
+      const newCache = { ...prev };
+      let changed = false;
+      keys.forEach((key) => {
+        if (!tabs.find((t) => t.key === key)) {
+          delete newCache[key];
+          changed = true;
+        }
+      });
+      return changed ? newCache : prev;
+    });
+  }, [tabs]);
 
   useEffect(() => {
     if (!matchedMeta) {
@@ -244,6 +297,33 @@ export function AdminLayout() {
 
       messageApi.info("正在刷新权限与菜单...");
       window.location.reload();
+    }
+  };
+
+  const getContextMenuItems = (tab: any): MenuProps["items"] => [
+    { key: "close", label: "关闭当前", icon: <CloseOutlined />, disabled: !tab.closable },
+    { key: "others", label: "关闭其他", icon: <CloseCircleOutlined /> },
+    { key: "left", label: "关闭左侧", icon: <ArrowLeftOutlined /> },
+    { key: "right", label: "关闭右侧", icon: <ArrowRightOutlined /> },
+  ];
+
+  const handleTabAction = (key: string, action: string) => {
+    switch (action) {
+      case "close": removeTab(key); break;
+      case "others": closeOthers(key); break;
+      case "left": closeLeft(key); break;
+      case "right": closeRight(key); break;
+    }
+  };
+
+  const toolMenu: MenuProps = {
+    items: [
+      { key: "closeAll", label: "关闭所有", icon: <MinusCircleOutlined /> },
+      { key: "reload", label: "刷新当前", icon: <ReloadOutlined /> },
+    ],
+    onClick: ({ key }) => {
+      if (key === "closeAll") closeAll();
+      if (key === "reload") window.location.reload();
     }
   };
 
@@ -346,8 +426,59 @@ export function AdminLayout() {
             </div>
           </Header>
 
-          <Content className="app-content">
-            <Outlet />
+          {/* Multi-Tabs Bar */}
+          <div className="admin-tabs-container">
+            <Tabs
+              className="admin-tabs"
+              activeKey={activeKey}
+              onChange={(key) => navigate(key)}
+              type="editable-card"
+              hideAdd
+              onEdit={(key, action) => {
+                if (action === "remove") removeTab(key as string);
+              }}
+              items={tabs.map(tab => ({
+                key: tab.key,
+                closable: tab.closable,
+                label: (
+                  <Dropdown
+                    menu={{ 
+                      items: getContextMenuItems(tab),
+                      onClick: ({ key: actionKey }) => handleTabAction(tab.key, actionKey)
+                    }}
+                    trigger={["contextMenu"]}
+                  >
+                    <span>
+                      <span className="admin-tab-icon">{resolveMenuIcon(tab.icon)}</span>
+                      {tab.label}
+                    </span>
+                  </Dropdown>
+                )
+              }))}
+            />
+            <div className="admin-tabs-tools">
+              <Dropdown menu={toolMenu} placement="bottomRight">
+                <Button className="admin-tabs-tool-btn" icon={<EllipsisOutlined />} />
+              </Dropdown>
+            </div>
+          </div>
+
+          <Content className="app-content" style={{ padding: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            <div className="keep-alive-wrapper">
+              {tabs.map((tab) => (
+                <div
+                  key={tab.key}
+                  className="keep-alive-page"
+                  style={{ display: tab.key === activeKey ? "block" : "none" }}
+                >
+                  {componentCache[tab.key] || (
+                    <div style={{ padding: 20 }}>
+                      <Typography.Text type="secondary">页面加载中...</Typography.Text>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
           </Content>
         </Layout>
       </Layout>
